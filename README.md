@@ -4,29 +4,25 @@ This repository is the private backend repository for Nashir.
 
 ## Governance Status
 
-This repository is currently in governance bootstrap state only.
+This repository currently contains a minimal runtime skeleton only.
 
-No backend implementation is authorized.
+The selected setup stack is TypeScript, Node.js LTS, Fastify, pnpm, Zod,
+PostgreSQL, and node-postgres / pg. The `pg` package is declared only; no
+database connection is created or executed.
 
-No API routes are authorized.
+The `/health` endpoint is an infrastructure smoke check only. It is not a
+product, business, or workspace-scoped API route.
 
-No SQL migrations are authorized.
+No product API routes, controllers, services, repositories, SQL migrations,
+migration runner, ORM/query layer, auth implementation, generated clients,
+deployment configuration, or CI workflows are authorized.
 
-No migration runner is authorized.
-
-No database configuration is authorized.
-
-No environment or secrets configuration is authorized.
-
-No ORM models are authorized.
-
-No generated clients are authorized.
-
-No package or dependency files are authorized.
-
-No deployment configuration is authorized.
+Generated clients remain blocked until a later explicit generated-client gate.
 
 No production or pilot readiness is claimed.
+
+`.env.example` contains placeholder variable names and values only. It contains
+no real secrets, production URLs, or credentials.
 
 ## Contract Authority
 

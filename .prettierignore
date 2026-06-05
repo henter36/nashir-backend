@@ -1,0 +1,5 @@
+.github/
+CODEOWNERS
+SECURITY.md
+docs/
+pnpm-lock.yaml
