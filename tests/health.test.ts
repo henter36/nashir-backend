@@ -11,7 +11,7 @@ afterEach(async () => {
 
 describe("infrastructure healthcheck", () => {
   it("reports that the runtime shell is available", async () => {
-    const app = buildApp();
+    const app = buildApp({ logger: false });
     apps.push(app);
 
     const response = await app.inject({

@@ -1,7 +1,10 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyServerOptions
+} from "fastify";
 
-export function buildApp(): FastifyInstance {
-  const app = Fastify({ logger: true });
+export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
+  const app = Fastify({ logger: true, ...opts });
 
   app.get("/health", async () => ({
     status: "ok"
