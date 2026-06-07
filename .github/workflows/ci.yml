@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: nashir-backend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Validate contract authority
         working-directory: nashir-backend
