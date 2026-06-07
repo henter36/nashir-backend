@@ -35,7 +35,7 @@ type HeaderInspection =
   | { reason: "blank" };
 
 function inspectHeader(headers: HeadersLike, name: string): HeaderInspection {
-  let raw: string | string[] | undefined = headers[name];
+  let raw: string | readonly string[] | undefined = headers[name];
 
   if (raw === undefined) {
     const lowerName = name.toLowerCase();
