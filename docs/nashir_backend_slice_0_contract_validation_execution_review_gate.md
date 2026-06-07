@@ -117,6 +117,6 @@ This review confirms that the already-merged PR #7 stayed within its approved lo
 
 ## 8. Recommended Next Step
 
-Open a Backend Slice 0 Contract Validation Execution Follow-up gate if any residual issue is identified after this review is merged, or a Backend Slice 0 Infrastructure Validation Review gate if no issues remain — depending on whether any issues remain after this gate is reviewed and merged.
+Open a Backend Slice 0 Contract Validation Execution Follow-up gate if any residual issue is identified after this review is merged, or a Backend Slice 0 Infrastructure Validation Review gate if no issues remain.
 
 Do not open a backend implementation, route, auth, database, SQL, migration, generated-client, CI, runtime-dependency, provider/model/prompt/tool/connector execution, publishing, production-readiness, or pilot-readiness gate from this review alone.
