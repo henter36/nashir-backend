@@ -47,7 +47,7 @@ This gate carries forward the validation-only posture confirmed by PR #7–#11 a
 |---|---|
 | `main` working tree | Clean (`git status --short` empty) |
 | Latest merged gate | PR #11 — `docs/scripts: pin authority commit and clean contract validation` (merge commit `aae6961`) |
-| `npm run lint` | Passes |
+| `npm run lint` and `npm run format:check` | Passes |
 | `NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts` | Passes; authority `HEAD` matches the pinned commit `04f54f8be852001173f4014cb2d81c5cdb97e35c` |
 | Backend route surface | `GET /health` only (`src/app.ts:9`) |
 | Request context module | Implemented and unit-tested (`src/request-context.ts`, `tests/request-context.test.ts`) but not registered as Fastify middleware/hooks and not consumed by any route |
@@ -92,7 +92,7 @@ These are the files a *future*, separately-approved implementation gate could pl
 
 | File | Plausible future change (planning only) |
 |---|---|
-| `src/app.ts` | Register request-context resolution as Fastify plumbing (e.g., a `preHandler` hook/plugin) ahead of the existing `/health` route, and apply a consistent error-response shape for `REQUEST_CONTEXT_REQUIRED` failures, without adding any new route |
+| `src/app.ts` | Register request-context resolution as Fastify plumbing (e.g., a `preHandler` hook/plugin) while ensuring the `/health` route is excluded, and apply a consistent error-response shape for `REQUEST_CONTEXT_REQUIRED` failures, without adding any new route |
 | `src/request-context.ts` | Minor adjustments only if needed to integrate cleanly as Fastify plumbing (e.g., exporting a plugin wrapper); core resolution logic is already implemented and tested |
 | `src/index.ts` | Touched only if the entry point needs to pass through new build options; expected to remain unchanged |
 | `tests/health.test.ts` | Extended only if `/health`'s response or behavior must be re-asserted under the new plumbing (it must keep passing unchanged in behavior) |
@@ -149,7 +149,7 @@ Before any future implementation gate for this boundary may begin (i.e., before 
 1. This planning gate is merged.
 2. A **Backend Slice 0 Minimal Implementation Planning Review Gate** (`docs/nashir_backend_slice_0_minimal_implementation_planning_review_gate.md`) is opened, reviewed, and reaches an explicit GO for *planning* — and that review gate itself does not authorize implementation.
 3. A separate, explicit user decision — distinct from any documentation/planning gate — authorizes the transition from planning into implementation for this specific boundary.
-4. `main` is clean and `npm run lint`, `npm run typecheck`, and `npm test` all pass on the commit the implementation gate would branch from.
+4. `main` is clean and `npm run lint`, `npm run typecheck`, `npm run format:check`, and `npm test` all pass on the commit the implementation gate would branch from.
 5. `NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts` and `NASHIR_AUTHORITY_REPO=../nashir npm run validate:contract-authority -- --authority-ref 04f54f8be852001173f4014cb2d81c5cdb97e35c` (or the CI-pinned ref, as applicable) both pass, confirming the authority posture is unchanged.
 6. The implementation gate's own scope statement explicitly repeats the forbidden-areas list in Section 7 and the non-authorization boundary in Section 11, and is reviewed against them before any commit.
 
@@ -164,6 +164,7 @@ git status --short
 git log --oneline -5
 npm run lint
 npm run typecheck
+npm run format:check
 npm test
 NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts
 NASHIR_AUTHORITY_REPO=../nashir npm run validate:contract-authority -- --authority-ref 04f54f8be852001173f4014cb2d81c5cdb97e35c
