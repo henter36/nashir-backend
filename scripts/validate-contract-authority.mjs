@@ -12,7 +12,7 @@ const AUTHORITY_FILES = [
   "docs/nashir_auth_rbac_openapi_alignment_final_re_review_gate.md",
   "docs/nashir_backend_slice_0_contract_safe_infrastructure_validation_action_gate.md"
 ];
-const COPIED_AUTHORITY_FILES = AUTHORITY_FILES.slice(0, 3);
+const COPIED_AUTHORITY_FILES = AUTHORITY_FILES;
 const GENERATED_CLIENT_DIRECTORIES = [
   "src/generated",
   "generated",
@@ -137,18 +137,18 @@ if (!options?.authorityRepo) {
           pass(
             `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
           );
-        }
 
-        for (const relativePath of AUTHORITY_FILES) {
-          try {
-            runReadOnlyGit(authorityRepo, [
-              "cat-file",
-              "-e",
-              `${PINNED_AUTHORITY_SHA}:${relativePath}`
-            ]);
-            pass(`Authority file exists at pinned SHA: ${relativePath}`);
-          } catch {
-            fail(`Authority file missing at pinned SHA: ${relativePath}`);
+          for (const relativePath of AUTHORITY_FILES) {
+            try {
+              runReadOnlyGit(authorityRepo, [
+                "cat-file",
+                "-e",
+                `${PINNED_AUTHORITY_SHA}:${relativePath}`
+              ]);
+              pass(`Authority file exists at pinned SHA: ${relativePath}`);
+            } catch {
+              fail(`Authority file missing at pinned SHA: ${relativePath}`);
+            }
           }
         }
       }
