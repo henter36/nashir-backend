@@ -48,12 +48,12 @@ git status --short
 git log --oneline -5
 grep -n "validate:contracts" package.json
 test -f scripts/validate-contracts.mjs && echo "script exists"
-grep -n "child_process\|node:child_process" scripts/validate-contracts.mjs || echo "no child_process import found"
+grep -n "child_process" scripts/validate-contracts.mjs || echo "no child_process import found"
 ls -la .github/workflows
 git log --oneline -- .github/workflows/ci.yml
 git show --stat 3bfcea7bfae2671c10897c6efe59725636e69719
 git show --stat ef0a2bfbc4be9c573dbd5435d35f61ea235e553c
-grep -n "app\.\(get\|post\|put\|delete\|patch\)" src/app.ts
+grep -E -n "app\.(get|post|put|delete|patch)" src/app.ts
 find . -maxdepth 4 -iname "*generated*" -not -path "./node_modules/*" -not -path "./.git/*"
 grep -n -A6 '"dependencies"' package.json
 gh pr view 7 --json mergeCommit,title
