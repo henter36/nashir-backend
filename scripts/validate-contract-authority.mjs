@@ -104,31 +104,36 @@ function collectFilesRecursively(directory) {
 }
 
 function verifyAllowedCiWorkflows() {
-  const workflowDirectory = resolve(backendRepo, CI_WORKFLOW_DIRECTORY);
+  try {
+    const workflowDirectory = resolve(backendRepo, CI_WORKFLOW_DIRECTORY);
 
-  if (!existsSync(workflowDirectory)) {
-    pass(`CI workflow directory absent from backend: ${CI_WORKFLOW_DIRECTORY}`);
-    return;
-  }
-
-  if (!lstatSync(workflowDirectory).isDirectory()) {
-    fail(`CI workflow path is not a directory: ${CI_WORKFLOW_DIRECTORY}`);
-    return;
-  }
-
-  const workflowFiles = collectFilesRecursively(workflowDirectory);
-
-  if (workflowFiles.length === 0) {
-    pass(`CI workflow directory is empty: ${CI_WORKFLOW_DIRECTORY}`);
-    return;
-  }
-
-  for (const workflowFile of workflowFiles) {
-    if (ALLOWED_CI_WORKFLOW_FILES.has(workflowFile)) {
-      pass(`Allowed CI workflow exists in backend: ${workflowFile}`);
-    } else {
-      fail(`Unauthorized CI workflow exists in backend: ${workflowFile}`);
+    if (!existsSync(workflowDirectory)) {
+      pass(`CI workflow directory absent from backend: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
     }
+
+    if (!lstatSync(workflowDirectory).isDirectory()) {
+      fail(`CI workflow path is not a directory: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
+    }
+
+    const workflowFiles = collectFilesRecursively(workflowDirectory);
+
+    if (workflowFiles.length === 0) {
+      pass(`CI workflow directory is empty: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
+    }
+
+    for (const workflowFile of workflowFiles) {
+      if (ALLOWED_CI_WORKFLOW_FILES.has(workflowFile)) {
+        pass(`Allowed CI workflow exists in backend: ${workflowFile}`);
+      } else {
+        fail(`Unauthorized CI workflow exists in backend: ${workflowFile}`);
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`Failed to verify CI workflows: ${message}`);
   }
 }
 
