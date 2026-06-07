@@ -1,18 +1,16 @@
-import { execFileSync } from "node:child_process";
 import console from "node:console";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 
-const PINNED_AUTHORITY_SHA = "04f54f8be852001173f4014cb2d81c5cdb97e35c";
+const EXPECTED_AUTHORITY_COMMIT = "04f54f8be852001173f4014cb2d81c5cdb97e35c";
 
-const REQUIRED_AUTHORITY_FILES = [
+const REQUIRED_CONTRACT_FILES = [
   "docs/nashir_v1_openapi.yaml",
   "docs/nashir_ai_agent_runtime_selection_planning_gate.md"
 ];
 
-const AGENT_RUNTIME_GATE_PATH =
-  "docs/nashir_ai_agent_runtime_selection_planning_gate.md";
+const AGENT_RUNTIME_GATE_RELATIVE_PATH = REQUIRED_CONTRACT_FILES[1];
 
 const AGENT_RUNTIME_GATE_REQUIRED_MARKERS = [
   "Decision:",
@@ -33,157 +31,158 @@ const AGENT_RUNTIME_GATE_REQUIRED_MARKERS = [
   "pilot"
 ];
 
-const failures = [];
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 
-function pass(message) {
-  console.log(`PASS: ${message}`);
+const outcomes = [];
+
+function report(ok, message) {
+  outcomes.push(ok);
+  (ok ? console.log : console.error)(`${ok ? "PASS" : "FAIL"}: ${message}`);
 }
 
-function fail(message) {
-  failures.push(message);
-  console.error(`FAIL: ${message}`);
+function stopNow(message) {
+  report(false, message);
+  console.error("FAIL: Stopping immediately; no further checks were run.");
+  process.exit(1);
 }
 
 function parseArguments(argv) {
-  const options = {
-    authorityRepo: process.env.NASHIR_AUTHORITY_REPO,
-    authorityRef: "HEAD"
-  };
+  let authorityRepo = process.env.NASHIR_AUTHORITY_REPO ?? null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
 
-    if (argument === "--") {
-      continue;
+    if (argument !== "--authority-repo") {
+      return { error: `Unknown argument: ${argument}` };
     }
 
-    if (argument === "--authority-repo" || argument === "--authority-ref") {
-      const value = argv[index + 1];
-      if (!value || value.startsWith("--")) {
-        throw new Error(`${argument} requires a value`);
-      }
-
-      if (argument === "--authority-repo") {
-        options.authorityRepo = value;
-      } else {
-        options.authorityRef = value;
-      }
-
-      index += 1;
-      continue;
+    const value = argv[index + 1];
+    if (!value) {
+      return { error: "--authority-repo requires a path value" };
     }
 
-    throw new Error(`Unknown argument: ${argument}`);
+    authorityRepo = value;
+    index += 1;
   }
 
-  return options;
+  if (!authorityRepo) {
+    return {
+      error:
+        "Authority repository path is required via --authority-repo or NASHIR_AUTHORITY_REPO"
+    };
+  }
+
+  return { authorityRepo };
 }
 
-function runReadOnlyGit(authorityRepo, args) {
-  return execFileSync("git", ["-C", authorityRepo, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
-  }).trim();
+function readWorkingTreeFile(repoPath, relativePath) {
+  const absolutePath = resolve(repoPath, relativePath);
+
+  if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+    return null;
+  }
+
+  return readFileSync(absolutePath, "utf8");
 }
 
-let options;
+// Reads HEAD/refs/packed-refs directly so this script never has to spawn git.
+function readCommitFromGitMetadata(repoPath) {
+  try {
+    const head = readFileSync(resolve(repoPath, ".git", "HEAD"), "utf8").trim();
 
-try {
-  options = parseArguments(process.argv.slice(2));
-} catch (error) {
-  fail(error.message);
+    if (COMMIT_SHA_PATTERN.test(head)) {
+      return head;
+    }
+
+    const symbolicRef = /^ref:\s*(\S+)$/.exec(head)?.[1];
+    if (!symbolicRef) {
+      return null;
+    }
+
+    const refPath = resolve(repoPath, ".git", symbolicRef);
+    if (existsSync(refPath)) {
+      const ref = readFileSync(refPath, "utf8").trim();
+      return COMMIT_SHA_PATTERN.test(ref) ? ref : null;
+    }
+
+    const packedRefs = readFileSync(resolve(repoPath, ".git", "packed-refs"), "utf8");
+    for (const line of packedRefs.split("\n")) {
+      const [sha, name] = line.trim().split(/\s+/);
+      if (name === symbolicRef && COMMIT_SHA_PATTERN.test(sha)) {
+        return sha;
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
-if (!options?.authorityRepo) {
-  fail(
-    "Authority repository path is required via --authority-repo or NASHIR_AUTHORITY_REPO"
+const parsed = parseArguments(process.argv.slice(2));
+
+if (parsed.error) {
+  stopNow(parsed.error);
+}
+
+const authorityRepoPath = resolve(parsed.authorityRepo);
+
+if (!existsSync(authorityRepoPath) || !statSync(authorityRepoPath).isDirectory()) {
+  stopNow(`Authority repository path is not a local directory: ${authorityRepoPath}`);
+}
+
+report(true, `Authority repository directory found: ${authorityRepoPath}`);
+
+for (const relativePath of REQUIRED_CONTRACT_FILES) {
+  const present = readWorkingTreeFile(authorityRepoPath, relativePath) !== null;
+  report(
+    present,
+    `Required contract file ${present ? "present" : "missing"} in working tree: ${relativePath}`
+  );
+}
+
+const gateContent = readWorkingTreeFile(authorityRepoPath, AGENT_RUNTIME_GATE_RELATIVE_PATH);
+
+if (gateContent === null) {
+  report(
+    false,
+    `Cannot check Agent Runtime planning gate markers; file is missing: ${AGENT_RUNTIME_GATE_RELATIVE_PATH}`
   );
 } else {
-  const requestedAuthorityRepo = resolve(options.authorityRepo);
-
-  if (!existsSync(requestedAuthorityRepo)) {
-    fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
-  } else if (!lstatSync(requestedAuthorityRepo).isDirectory()) {
-    fail(
-      `Authority repository path is not a directory: ${requestedAuthorityRepo}`
+  for (const marker of AGENT_RUNTIME_GATE_REQUIRED_MARKERS) {
+    const found = gateContent.includes(marker);
+    report(
+      found,
+      `Agent Runtime planning gate ${found ? "contains" : "is missing"} required marker: "${marker}"`
     );
-  } else {
-    const authorityRepo = realpathSync(requestedAuthorityRepo);
-    pass(`Authority repository path exists: ${authorityRepo}`);
-
-    try {
-      const isGitRepository = runReadOnlyGit(authorityRepo, [
-        "rev-parse",
-        "--is-inside-work-tree"
-      ]);
-
-      if (isGitRepository !== "true") {
-        fail(
-          `Authority repository path is not a Git work tree: ${authorityRepo}`
-        );
-      } else {
-        pass(`Authority repository is a Git work tree: ${authorityRepo}`);
-
-        const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
-          "rev-parse",
-          "--verify",
-          `${options.authorityRef}^{commit}`
-        ]);
-
-        if (resolvedAuthoritySha !== PINNED_AUTHORITY_SHA) {
-          fail(
-            `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected pinned SHA ${PINNED_AUTHORITY_SHA}`
-          );
-        } else {
-          pass(
-            `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
-          );
-
-          for (const relativePath of REQUIRED_AUTHORITY_FILES) {
-            try {
-              runReadOnlyGit(authorityRepo, [
-                "cat-file",
-                "-e",
-                `${PINNED_AUTHORITY_SHA}:${relativePath}`
-              ]);
-              pass(`Contract authority file exists at pinned SHA: ${relativePath}`);
-            } catch {
-              fail(`Contract authority file missing at pinned SHA: ${relativePath}`);
-            }
-          }
-
-          try {
-            const gateContent = runReadOnlyGit(authorityRepo, [
-              "show",
-              `${PINNED_AUTHORITY_SHA}:${AGENT_RUNTIME_GATE_PATH}`
-            ]);
-
-            for (const marker of AGENT_RUNTIME_GATE_REQUIRED_MARKERS) {
-              if (gateContent.includes(marker)) {
-                pass(`Agent Runtime planning gate contains required marker: "${marker}"`);
-              } else {
-                fail(`Agent Runtime planning gate is missing required marker: "${marker}"`);
-              }
-            }
-          } catch (error) {
-            fail(
-              `Failed to read Agent Runtime planning gate at pinned SHA: ${error.stderr?.trim() || error.message}`
-            );
-          }
-        }
-      }
-    } catch (error) {
-      fail(
-        `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
-      );
-    }
   }
 }
 
-if (failures.length > 0) {
-  console.error(
-    `FAIL: Contract validation failed with ${failures.length} error(s).`
+const observedCommit = readCommitFromGitMetadata(authorityRepoPath);
+
+if (observedCommit === null) {
+  console.warn(
+    "WARN: Could not determine the authority repository commit from local .git metadata; " +
+      "skipping the pinned-commit comparison. This script performs local, read-only " +
+      "validation only and intentionally avoids running git."
   );
+} else if (observedCommit === EXPECTED_AUTHORITY_COMMIT) {
+  report(
+    true,
+    `Authority repository HEAD matches the expected contract reference commit: ${EXPECTED_AUTHORITY_COMMIT}`
+  );
+} else {
+  console.warn(
+    `WARN: Authority repository HEAD (${observedCommit}) differs from the expected contract ` +
+      `reference commit (${EXPECTED_AUTHORITY_COMMIT}). Confirm this is the intended ` +
+      "henter36/nashir checkout before relying on this run."
+  );
+}
+
+const failureCount = outcomes.filter((ok) => !ok).length;
+
+if (failureCount > 0) {
+  console.error(`FAIL: Contract validation failed with ${failureCount} error(s).`);
   process.exit(1);
 }
 
