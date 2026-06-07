@@ -19,7 +19,14 @@ describe("infrastructure healthcheck", () => {
       url: "/health"
     });
 
+    const body = response.json();
+
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "ok" });
+    expect(body.status).toBe("ok");
+    expect(body.service).toBe("nashir-backend");
+    expect(body.runtime).toBe("node");
+    expect(typeof body.uptimeSeconds).toBe("number");
+    expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(Number.isFinite(body.uptimeSeconds)).toBe(true);
   });
 });
