@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "validate:contract-authority": "node scripts/validate-contract-authority.mjs"
   },
   "dependencies": {
     "fastify": "^5.4.0",
