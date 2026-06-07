@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "validate:contract-authority": "node scripts/validate-contract-authority.mjs"
+    "validate:contract-authority": "node scripts/validate-contract-authority.mjs",
+    "validate:contracts": "node scripts/validate-contracts.mjs"
   },
   "dependencies": {
     "fastify": "^5.4.0",
