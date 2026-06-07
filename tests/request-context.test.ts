@@ -8,6 +8,8 @@ import {
   type RequestContextError
 } from "../src/request-context.js";
 
+type RawHeaders = Record<string, string | readonly string[] | undefined>;
+
 describe("resolveRequestContextFromHeaders", () => {
   it("returns context when both headers are present", () => {
     const result = resolveRequestContextFromHeaders({
@@ -86,6 +88,10 @@ describe("resolveRequestContextFromHeaders", () => {
       expect(result.statusCode).toBe(401);
       expect(result.code).toBe("REQUEST_CONTEXT_REQUIRED");
       expect(result.missing).toEqual([WORKSPACE_ID_HEADER, ACTOR_ID_HEADER]);
+      expect(result.issues).toEqual([
+        { header: WORKSPACE_ID_HEADER, reason: "missing" },
+        { header: ACTOR_ID_HEADER, reason: "missing" }
+      ]);
     }
   });
 
@@ -98,6 +104,96 @@ describe("resolveRequestContextFromHeaders", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.missing).toEqual([WORKSPACE_ID_HEADER, ACTOR_ID_HEADER]);
+    }
+  });
+
+  it("reports reason missing when the workspace header is absent", () => {
+    const result = resolveRequestContextFromHeaders({
+      [ACTOR_ID_HEADER]: "actor-456"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: WORKSPACE_ID_HEADER,
+        reason: "missing"
+      });
+    }
+  });
+
+  it("reports reason missing when the actor header is absent", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: ACTOR_ID_HEADER,
+        reason: "missing"
+      });
+    }
+  });
+
+  it("reports reason blank when the workspace header is whitespace-only", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "   ",
+      [ACTOR_ID_HEADER]: "actor-456"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: WORKSPACE_ID_HEADER,
+        reason: "blank"
+      });
+    }
+  });
+
+  it("reports reason blank when the actor header is whitespace-only", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: ""
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: ACTOR_ID_HEADER,
+        reason: "blank"
+      });
+    }
+  });
+
+  it("treats a blank first array value as blank without scanning later values", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: ["   ", "workspace-456"],
+      [ACTOR_ID_HEADER]: "actor-456"
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: WORKSPACE_ID_HEADER,
+        reason: "blank"
+      });
+    }
+  });
+
+  it("treats a non-string header value as missing", () => {
+    const headers = {
+      [WORKSPACE_ID_HEADER]: 12345,
+      [ACTOR_ID_HEADER]: "actor-456"
+    } as unknown as RawHeaders;
+
+    const result = resolveRequestContextFromHeaders(headers);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues).toContainEqual({
+        header: WORKSPACE_ID_HEADER,
+        reason: "missing"
+      });
     }
   });
 
