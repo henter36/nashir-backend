@@ -160,7 +160,7 @@ grep -E -n "app\.(get|post|put|delete|patch)" src/app.ts
 ls -la .github/workflows
 git log --oneline -- .github/workflows/ci.yml
 find . -maxdepth 4 -iname "*generated*" -not -path "./node_modules/*" -not -path "./.git/*"
-find . -maxdepth 3 -iname "*auth*" -o -iname "*migration*" -o -iname "*.sql" -not -path "./node_modules/*" -not -path "./.git/*"
+find . -maxdepth 3 \( -iname "*auth*" -o -iname "*migration*" -o -iname "*.sql" \) -not -path "./node_modules/*" -not -path "./.git/*"
 grep -n -A6 '"dependencies"' package.json
 gh pr view 7 --json mergeCommit,title
 gh pr view 8 --json mergeCommit,title
