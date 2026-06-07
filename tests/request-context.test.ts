@@ -78,6 +78,17 @@ describe("resolveRequestContextFromHeaders", () => {
     }
   });
 
+  it("fails defensively when headers are nullish", () => {
+    const result = resolveRequestContextFromHeaders(null);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.statusCode).toBe(401);
+      expect(result.code).toBe("REQUEST_CONTEXT_REQUIRED");
+      expect(result.missing).toEqual([WORKSPACE_ID_HEADER, ACTOR_ID_HEADER]);
+    }
+  });
+
   it("fails when header values are blank", () => {
     const result = resolveRequestContextFromHeaders({
       [WORKSPACE_ID_HEADER]: "   ",
@@ -119,7 +130,9 @@ describe("requireRequestContext", () => {
   it("throws an error with statusCode 401 and code REQUEST_CONTEXT_REQUIRED on failure", () => {
     const result = resolveRequestContextFromHeaders({});
 
-    expect(() => requireRequestContext(result)).toThrow("REQUEST_CONTEXT_REQUIRED");
+    expect(() => requireRequestContext(result)).toThrow(
+      "Missing required request context header(s)"
+    );
 
     try {
       requireRequestContext(result);

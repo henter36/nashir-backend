@@ -45,9 +45,12 @@ function readHeader(headers: HeadersLike, name: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-export function resolveRequestContextFromHeaders(headers: HeadersLike): RequestContextResult {
-  const workspaceId = readHeader(headers, WORKSPACE_ID_HEADER);
-  const actorId = readHeader(headers, ACTOR_ID_HEADER);
+export function resolveRequestContextFromHeaders(
+  headers: HeadersLike | null | undefined
+): RequestContextResult {
+  const safeHeaders = headers ?? {};
+  const workspaceId = readHeader(safeHeaders, WORKSPACE_ID_HEADER);
+  const actorId = readHeader(safeHeaders, ACTOR_ID_HEADER);
 
   const missing: string[] = [];
   if (!workspaceId) {
@@ -78,7 +81,7 @@ export function requireRequestContext(result: RequestContextResult): RequestCont
     return result.context;
   }
 
-  const error = new Error(result.code) as RequestContextError;
+  const error = new Error(result.message) as RequestContextError;
   error.statusCode = result.statusCode;
   error.code = result.code;
   throw error;
