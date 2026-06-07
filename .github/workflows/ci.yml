@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          path: nashir-backend
+          persist-credentials: false
+
+      - name: Checkout Nashir authority
+        uses: actions/checkout@v4
+        with:
+          repository: henter36/nashir
+          ref: 36da9ed31903562bddfb7ffd669841956e334a51
+          path: nashir-authority
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: nashir-backend
+        run: npm install --no-audit --no-fund
+
+      - name: Validate contract authority
+        working-directory: nashir-backend
+        run: |
+          npm run validate:contract-authority -- \
+            --authority-repo ../nashir-authority \
+            --authority-ref 36da9ed31903562bddfb7ffd669841956e334a51
+
+      - name: Lint
+        working-directory: nashir-backend
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: nashir-backend
+        run: npm run typecheck
+
+      - name: Test
+        working-directory: nashir-backend
+        run: npm test

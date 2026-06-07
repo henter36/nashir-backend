@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import console from "node:console";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,8 @@ const GENERATED_CLIENT_DIRECTORIES = [
   "generated",
   "openapi-generated"
 ];
-const FORBIDDEN_CI_DIRECTORIES = [".github/workflows"];
+const CI_WORKFLOW_DIRECTORY = ".github/workflows";
+const ALLOWED_CI_WORKFLOW_FILES = new Set([".github/workflows/ci.yml"]);
 
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -82,6 +83,57 @@ function verifyAbsentPaths(paths, label) {
     } else {
       pass(`${label} absent from backend: ${relativePath}`);
     }
+  }
+}
+
+function collectFilesRecursively(directory) {
+  const files = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const absolutePath = resolve(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...collectFilesRecursively(absolutePath));
+      continue;
+    }
+
+    files.push(relative(backendRepo, absolutePath).replaceAll("\\", "/"));
+  }
+
+  return files;
+}
+
+function verifyAllowedCiWorkflows() {
+  try {
+    const workflowDirectory = resolve(backendRepo, CI_WORKFLOW_DIRECTORY);
+
+    if (!existsSync(workflowDirectory)) {
+      pass(`CI workflow directory absent from backend: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
+    }
+
+    if (!lstatSync(workflowDirectory).isDirectory()) {
+      fail(`CI workflow path is not a directory: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
+    }
+
+    const workflowFiles = collectFilesRecursively(workflowDirectory);
+
+    if (workflowFiles.length === 0) {
+      pass(`CI workflow directory is empty: ${CI_WORKFLOW_DIRECTORY}`);
+      return;
+    }
+
+    for (const workflowFile of workflowFiles) {
+      if (ALLOWED_CI_WORKFLOW_FILES.has(workflowFile)) {
+        pass(`Allowed CI workflow exists in backend: ${workflowFile}`);
+      } else {
+        fail(`Unauthorized CI workflow exists in backend: ${workflowFile}`);
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    fail(`Failed to verify CI workflows: ${message}`);
   }
 }
 
@@ -162,7 +214,7 @@ if (!options?.authorityRepo) {
 
 verifyAbsentPaths(COPIED_AUTHORITY_FILES, "Copied authority file");
 verifyAbsentPaths(GENERATED_CLIENT_DIRECTORIES, "Generated client directory");
-verifyAbsentPaths(FORBIDDEN_CI_DIRECTORIES, "CI workflow directory");
+verifyAllowedCiWorkflows();
 
 if (failures.length > 0) {
   console.error(
