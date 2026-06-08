@@ -6,6 +6,7 @@ import Fastify, {
   type FastifyServerOptions
 } from "fastify";
 
+import { createHttpErrorResponse } from "./error-model.js";
 import {
   CORRELATION_ID_HEADER,
   resolveRequestContextFromHeaders,
@@ -55,11 +56,18 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
 
     const result = resolveRequestContextFromHeaders(request.headers);
     if (!result.ok) {
-      reply.code(result.statusCode).send({
-        error: result.code,
+      const errorResponse = createHttpErrorResponse({
+        code: result.code,
         message: result.message,
-        correlationId
+        statusCode: result.statusCode,
+        correlationId,
+        details: {
+          missing: result.missing,
+          issues: result.issues
+        }
       });
+
+      reply.code(errorResponse.statusCode).send(errorResponse.body);
       return;
     }
 
