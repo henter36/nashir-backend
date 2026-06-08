@@ -1,5 +1,6 @@
 export const WORKSPACE_ID_HEADER = "x-nashir-workspace-id";
 export const ACTOR_ID_HEADER = "x-nashir-actor-id";
+export const CORRELATION_ID_HEADER = "x-nashir-correlation-id";
 
 export interface RequestContext {
   workspaceId: string;
