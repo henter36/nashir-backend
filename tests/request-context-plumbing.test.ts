@@ -71,6 +71,20 @@ function expectHealthyBody(body: Record<string, unknown>): void {
   ]);
 }
 
+function expectNotFound(
+  statusCode: number,
+  body: Record<string, unknown>
+): void {
+  expect(statusCode).toBe(404);
+  expect(body.code).toBe("NOT_FOUND");
+  expect(body.message).toBe("Route not found.");
+  expect(body.statusCode).toBe(404);
+  expect(typeof body.correlationId).toBe("string");
+  expect(body.correlationId).not.toHaveLength(0);
+  expect(body.error).toBeUndefined();
+  expect(body.stack).toBeUndefined();
+}
+
 function expectRequestContextRequired(
   statusCode: number,
   body: Record<string, unknown>,
@@ -142,6 +156,55 @@ describe("/health route preservation under request-context plumbing", () => {
     });
 
     expectRequestContextRequired(statusCode, body);
+  });
+});
+
+describe("not-found handling via the internal ErrorModel serializer", () => {
+  it("returns an ErrorModel 404 for an unknown route once request context is satisfied", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: "/this-route-does-not-exist",
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expectNotFound(statusCode, body);
+  });
+
+  it("propagates a caller-supplied correlation id through to the not-found response", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: "/this-route-does-not-exist",
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [CORRELATION_ID_HEADER]: "caller-supplied-correlation-id"
+      }
+    });
+
+    expectNotFound(statusCode, body);
+    expect(body.correlationId).toBe("caller-supplied-correlation-id");
+  });
+
+  it("returns an ErrorModel 404 for /health/ once request context is satisfied, since it does not match the /health route", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: "/health/",
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expectNotFound(statusCode, body);
   });
 });
 
