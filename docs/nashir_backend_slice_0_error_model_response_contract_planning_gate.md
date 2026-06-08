@@ -232,7 +232,7 @@ Concrete alignment gaps between this schema and the accepted baseline's current 
 
 ## 9. Test Expectations for a Future Implementation Gate
 
-These are expectations to **inform** a future, explicitly-authorized implementation/execution gate's test plan. **No test file is modified by this gate** — confirmed by the after-editing verification (Section 16) showing only this new planning document in the diff.
+These are expectations to **inform** a future, explicitly-authorized implementation/execution gate's test plan. **No test file is modified by this gate** — confirmed by the verification commands (Section 15) showing only this new planning document in the diff.
 
 A future implementation that migrates toward the authority-aligned shape (Candidate C, Section 5) would need tests that assert, at minimum:
 
