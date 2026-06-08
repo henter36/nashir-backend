@@ -60,7 +60,11 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
         code: result.code,
         message: result.message,
         statusCode: result.statusCode,
-        correlationId
+        correlationId,
+        details: {
+          missing: result.missing,
+          issues: result.issues
+        }
       });
 
       reply.code(errorResponse.statusCode).send(errorResponse.body);
