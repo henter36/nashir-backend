@@ -12,6 +12,10 @@ const TEST_HARNESS_ROUTE = "/__test/request-context";
 
 const apps: FastifyInstance[] = [];
 
+function sortAlphabetically(values: string[]): string[] {
+  return [...values].sort((left, right) => left.localeCompare(right));
+}
+
 async function harnessHandler(request: FastifyRequest) {
   return {
     workspaceId: request.requestContext?.workspaceId ?? null,
@@ -52,7 +56,7 @@ describe("/health route preservation under request-context plumbing", () => {
     expect(body.service).toBe("nashir-backend");
     expect(body.runtime).toBe("node");
     expect(typeof body.uptimeSeconds).toBe("number");
-    expect(Object.keys(body).sort()).toEqual([
+    expect(sortAlphabetically(Object.keys(body))).toEqual([
       "runtime",
       "service",
       "status",
@@ -79,7 +83,7 @@ describe("/health route preservation under request-context plumbing", () => {
     expect(body.status).toBe("ok");
     expect(body.service).toBe("nashir-backend");
     expect(body.runtime).toBe("node");
-    expect(Object.keys(body).sort()).toEqual([
+    expect(sortAlphabetically(Object.keys(body))).toEqual([
       "runtime",
       "service",
       "status",
@@ -101,7 +105,7 @@ describe("/health route preservation under request-context plumbing", () => {
     expect(body.status).toBe("ok");
     expect(body.service).toBe("nashir-backend");
     expect(body.runtime).toBe("node");
-    expect(Object.keys(body).sort()).toEqual([
+    expect(sortAlphabetically(Object.keys(body))).toEqual([
       "runtime",
       "service",
       "status",
