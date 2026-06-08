@@ -268,6 +268,77 @@ describe("internal server error handling via the internal ErrorModel serializer"
   });
 });
 
+describe("internal workspace route harness", () => {
+  const WORKSPACE_ROUTE_HARNESS_PATH =
+    "/internal/workspace-route-harness/workspace-123";
+
+  it("rejects requests missing request-context headers with the existing 401 ErrorModel shape", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: WORKSPACE_ROUTE_HARNESS_PATH
+    });
+
+    expectRequestContextRequired(statusCode, body);
+  });
+
+  it("succeeds with valid request-context headers", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode } = await injectAndParse(app, {
+      method: "GET",
+      url: WORKSPACE_ROUTE_HARNESS_PATH,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expect(statusCode).toBe(200);
+  });
+
+  it("includes the route workspaceId, requestContext, and correlationId in the success response", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: WORKSPACE_ROUTE_HARNESS_PATH,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expect(statusCode).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.workspaceId).toBe("workspace-123");
+    expect(body.requestContext).toEqual({
+      workspaceId: "workspace-123",
+      actorId: "actor-456"
+    });
+    expect(typeof body.correlationId).toBe("string");
+    expect((body.correlationId as string).length).toBeGreaterThan(0);
+  });
+
+  it("propagates a caller-supplied correlation id through to the success response", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: WORKSPACE_ROUTE_HARNESS_PATH,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [CORRELATION_ID_HEADER]: "caller-supplied-correlation-id"
+      }
+    });
+
+    expect(statusCode).toBe(200);
+    expect(body.correlationId).toBe("caller-supplied-correlation-id");
+  });
+});
+
 describe("request-context plumbing on a gated non-health harness route", () => {
   it("rejects requests missing both request-context headers with the consistent error shape", async () => {
     const app = buildAppWithHarness();

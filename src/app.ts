@@ -21,6 +21,26 @@ declare module "fastify" {
 }
 
 const HEALTH_ROUTE = "/health";
+const WORKSPACE_ROUTE_HARNESS_ROUTE =
+  "/internal/workspace-route-harness/:workspaceId";
+
+interface WorkspaceRouteHarnessParams {
+  workspaceId: string;
+}
+
+async function workspaceRouteHarnessHandler(
+  request: FastifyRequest<{ Params: WorkspaceRouteHarnessParams }>
+) {
+  return {
+    ok: true,
+    workspaceId: request.params.workspaceId,
+    requestContext: {
+      workspaceId: request.requestContext?.workspaceId ?? null,
+      actorId: request.requestContext?.actorId ?? null
+    },
+    correlationId: request.correlationId ?? null
+  };
+}
 
 function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
   const raw = headers[CORRELATION_ID_HEADER];
@@ -80,6 +100,11 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     runtime: "node",
     uptimeSeconds: process.uptime()
   }));
+
+  // Read-only harness proving request-context plumbing reaches a real route:
+  // it echoes back the route param alongside the gated request context and
+  // correlation id, without touching auth, permissions, or any data layer.
+  app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
 
   app.setNotFoundHandler(async (request, reply) => {
     const errorResponse = createHttpErrorResponse({
