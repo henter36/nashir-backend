@@ -32,7 +32,7 @@ This is a documentation-only planning gate. It does not modify `src/app.ts`, `sr
 | Input | Use in this planning gate |
 |---|---|
 | `henter36/nashir-backend` PR #16 (merge commit `80ac642f3e8e7e9b214a2fe1038fa7c3b835627b`) | Defines the accepted implementation baseline (Section 4) whose boundary this gate plans beyond |
-| `henter36/nashir-backend` PR #17 (merge commit `a8746e65a7a25a923b37b765820155bde82546a8`) | Independent execution review confirming the baseline's boundary compliance and surfacing the still-open `qlty check` residual finding referenced in Section 9 |
+| `henter36/nashir-backend` PR #17 (merge commit `a8746e65a7a25a923b37b765820155bde82546a8`) | Independent execution review confirming the baseline's boundary compliance and surfacing the still-open `qlty check` residual finding referenced in Section 8 |
 | `henter36/nashir-backend` PR #18 (merge commit `138ecf0`) | Acceptance gate confirming the baseline is complete and accepted, and recommending this gate as the next step |
 | `docs/nashir_backend_slice_0_minimal_implementation_execution_review_gate.md` (added by PR #17) | Source of the accepted boundary's verified scope and the carried-forward residual quality-gate finding |
 | `docs/nashir_backend_slice_0_minimal_implementation_execution_acceptance_gate.md` (added by PR #18) | Source of the formally accepted file set, acceptance matrix, and residual risk review that this gate's "current accepted baseline" (Section 4) is drawn from |
@@ -57,7 +57,7 @@ As accepted by PR #18 (merge commit `138ecf0`), the Backend Slice 0 minimal impl
 
 **What does not yet exist** (and is therefore in scope to be *planned*, not implemented, next): any product route, any business API, any auth/RBAC decision logic, any database/SQL/ORM layer, any generated client, and any CI workflow beyond the existing `Validate backend` / `SonarCloud` / `qlty check` / `CodeRabbit` checks.
 
-**Carried-forward residual finding:** PR #17's review and PR #18's acceptance both record that the `qlty check` GitHub status reported `state: success` while its own description read `"2 blocking issues"` on the final pre-merge commit of PR #16 (`9624f0ff90dcf671fd9827256e88f52917d5ba3e`) — never investigated or dispositioned. This gate does not resolve that finding; it is noted in Section 9 as background context that should be closed out by the previously recommended follow-up gate independent of whichever next boundary is planned.
+**Carried-forward residual finding:** PR #17's review and PR #18's acceptance both record that the `qlty check` GitHub status reported `state: success` while its own description read `"2 blocking issues"` on the final pre-merge commit of PR #16 (`9624f0ff90dcf671fd9827256e88f52917d5ba3e`) — never investigated or dispositioned. This gate does not resolve that finding; it is noted in Section 8 as background context that should be closed out by the previously recommended follow-up gate independent of whichever next boundary is planned.
 
 ---
 
