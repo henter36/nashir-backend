@@ -95,6 +95,22 @@ describe("createErrorModel", () => {
     expect(input).toEqual(snapshotBefore);
   });
 
+  it("clones details to prevent post-creation mutation side-effects", () => {
+    const details = { missing: ["x-nashir-workspace-id"] };
+    const model = createErrorModel({
+      code: "REQUEST_CONTEXT_REQUIRED",
+      message: "Missing required request context header(s).",
+      statusCode: 401,
+      details
+    });
+
+    details.missing.push("another-header");
+
+    expect(model.details).toEqual({
+      missing: ["x-nashir-workspace-id"]
+    });
+  });
+
   it("handles unknown/undefined details safely", () => {
     const omitted = createErrorModel({
       code: "REQUEST_CONTEXT_REQUIRED",
