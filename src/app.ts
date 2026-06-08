@@ -86,10 +86,11 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
       code: "NOT_FOUND",
       message: "Route not found.",
       statusCode: 404,
-      correlationId: request.correlationId
+      correlationId:
+        request.correlationId ?? resolveCorrelationId(request.headers)
     });
 
-    reply.code(errorResponse.statusCode).send(errorResponse.body);
+    return reply.code(errorResponse.statusCode).send(errorResponse.body);
   });
 
   return app;
