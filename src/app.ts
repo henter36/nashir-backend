@@ -97,7 +97,9 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   // not-found 404 responses above are sent directly via reply.send and never
   // reach this handler. The thrown error's message and stack are deliberately
   // discarded so internal details are never leaked to the client.
-  app.setErrorHandler(async (_error, request, reply) => {
+  app.setErrorHandler(async (error, request, reply) => {
+    request.log.error(error);
+
     const errorResponse = createHttpErrorResponse({
       code: "INTERNAL_SERVER_ERROR",
       message: "Internal server error.",
