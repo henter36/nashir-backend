@@ -198,4 +198,22 @@ describe("evaluatePermissionGuard", () => {
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
   });
+  it("treats null resourceWorkspaceId as absent resource workspace boundary", () => {
+    const result = evaluatePermissionGuard({
+      requiredPermission: "workspace.products.read",
+      grantedPermissions: ["workspace.products.read"],
+      requestContext: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456"
+      },
+      resourceWorkspaceId: null
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      decision: "allowed",
+      requiredPermission: "workspace.products.read"
+    });
+  });
+
 });

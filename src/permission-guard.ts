@@ -9,7 +9,7 @@ export interface EvaluatePermissionGuardInput {
   requiredPermission: string;
   grantedPermissions: readonly string[];
   requestContext: PermissionGuardRequestContext;
-  resourceWorkspaceId?: string;
+  resourceWorkspaceId?: string | null;
   disclosureMode?: PermissionDisclosureMode;
 }
 
@@ -75,7 +75,7 @@ export function evaluatePermissionGuard(
   } = input;
 
   if (
-    resourceWorkspaceId !== undefined &&
+    resourceWorkspaceId != null &&
     resourceWorkspaceId !== requestContext.workspaceId
   ) {
     return notFoundResult(requiredPermission);
