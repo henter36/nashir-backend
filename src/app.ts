@@ -38,11 +38,15 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   app.decorateRequest("requestContext", undefined);
   app.decorateRequest("correlationId", undefined);
 
-  // Request-context plumbing applies to every route except /health, which
-  // must remain ungated and respond identically regardless of this hook.
-  app.addHook("preHandler", async (request, reply) => {
-    const requestPath = request.url.split("?")[0];
-    if (requestPath === HEALTH_ROUTE) {
+  // Request-context plumbing runs at onRequest -- the earliest hook, before
+  // body parsing -- so unauthorized or malformed requests are rejected
+  // without the cost or risk of parsing their payload. /health is identified
+  // via Fastify's own route metadata (routeOptions.url), which Fastify
+  // resolves from the matched route during routing and exposes by the time
+  // onRequest hooks run; this avoids fragile manual URL parsing and keeps
+  // /health ungated and unaffected, responding identically to before.
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.routeOptions.url === HEALTH_ROUTE) {
       return;
     }
 

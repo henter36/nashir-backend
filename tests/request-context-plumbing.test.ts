@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { buildApp } from "../src/app.js";
 import {
@@ -12,14 +12,21 @@ const TEST_HARNESS_ROUTE = "/__test/request-context";
 
 const apps: FastifyInstance[] = [];
 
-function buildAppWithHarness(): FastifyInstance {
-  const app = buildApp({ logger: false });
-
-  app.get(TEST_HARNESS_ROUTE, async (request) => ({
+async function harnessHandler(request: FastifyRequest) {
+  return {
     workspaceId: request.requestContext?.workspaceId ?? null,
     actorId: request.requestContext?.actorId ?? null,
     correlationId: request.correlationId ?? null
-  }));
+  };
+}
+
+function buildAppWithHarness(): FastifyInstance {
+  const app = buildApp({ logger: false });
+
+  // GET covers header-only assertions; POST lets the malformed/oversized
+  // body tests prove gating happens before Fastify attempts to parse a body.
+  app.get(TEST_HARNESS_ROUTE, harnessHandler);
+  app.post(TEST_HARNESS_ROUTE, harnessHandler);
 
   apps.push(app);
   return app;
@@ -78,6 +85,42 @@ describe("/health route preservation under request-context plumbing", () => {
       "status",
       "uptimeSeconds"
     ]);
+  });
+
+  it("remains ungated when called with a query string", async () => {
+    const app = buildAppWithHarness();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health?probe=1"
+    });
+
+    const body = response.json();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.status).toBe("ok");
+    expect(body.service).toBe("nashir-backend");
+    expect(body.runtime).toBe("node");
+    expect(Object.keys(body).sort()).toEqual([
+      "runtime",
+      "service",
+      "status",
+      "uptimeSeconds"
+    ]);
+  });
+
+  it("does not match the /health route (no trailing-slash normalization configured) and is therefore gated like any other unmatched path, not treated as /health", async () => {
+    const app = buildAppWithHarness();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health/"
+    });
+
+    const body = response.json();
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
   });
 });
 
@@ -190,6 +233,39 @@ describe("request-context plumbing on a gated non-health harness route", () => {
 
     expect(response.statusCode).toBe(200);
     expect(body.correlationId).toBe("caller-supplied-correlation-id");
+  });
+
+  it("rejects a gated request with a malformed JSON body before any parsing occurs", async () => {
+    const app = buildAppWithHarness();
+
+    const response = await app.inject({
+      method: "POST",
+      url: TEST_HARNESS_ROUTE,
+      payload: "{not-valid-json",
+      headers: { "content-type": "application/json" }
+    });
+
+    const body = response.json();
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+  });
+
+  it("rejects a gated request with an oversized body before any parsing occurs", async () => {
+    const app = buildAppWithHarness();
+    const oversizedPayload = "x".repeat(2 * 1024 * 1024);
+
+    const response = await app.inject({
+      method: "POST",
+      url: TEST_HARNESS_ROUTE,
+      payload: oversizedPayload,
+      headers: { "content-type": "text/plain" }
+    });
+
+    const body = response.json();
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
   });
 
   it("generates a correlation id when the caller does not supply one", async () => {
