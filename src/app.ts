@@ -81,5 +81,17 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     uptimeSeconds: process.uptime()
   }));
 
+  app.setNotFoundHandler(async (request, reply) => {
+    const errorResponse = createHttpErrorResponse({
+      code: "NOT_FOUND",
+      message: "Route not found.",
+      statusCode: 404,
+      correlationId:
+        request.correlationId ?? resolveCorrelationId(request.headers)
+    });
+
+    return reply.code(errorResponse.statusCode).send(errorResponse.body);
+  });
+
   return app;
 }
