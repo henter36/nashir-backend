@@ -46,7 +46,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   // onRequest hooks run; this avoids fragile manual URL parsing and keeps
   // /health ungated and unaffected, responding identically to before.
   app.addHook("onRequest", async (request, reply) => {
-    if (request.routeOptions.url === HEALTH_ROUTE) {
+    if (request.routeOptions?.url === HEALTH_ROUTE) {
       return;
     }
 
@@ -55,7 +55,7 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
 
     const result = resolveRequestContextFromHeaders(request.headers);
     if (!result.ok) {
-      await reply.code(result.statusCode).send({
+      reply.code(result.statusCode).send({
         error: result.code,
         message: result.message,
         correlationId
