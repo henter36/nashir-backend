@@ -290,6 +290,6 @@ NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts
 git show --stat 07a51b7e0bb8ae6f48cf07d5d9be35cd3d82cf9c
 git show --name-only --format=short 07a51b7e0bb8ae6f48cf07d5d9be35cd3d82cf9c
 
-grep -n "REQUEST_CONTEXT_REQUIRED|correlationId|error|message" src/app.ts src/request-context.ts tests/request-context-plumbing.test.ts
+grep -E -n "REQUEST_CONTEXT_REQUIRED|correlationId|error|message" src/app.ts src/request-context.ts tests/request-context-plumbing.test.ts
 grep -E -n "app\.(get|post|put|delete|patch)" src/app.ts
 ```
