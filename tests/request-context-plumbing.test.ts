@@ -53,9 +53,17 @@ function expectHealthyBody(body: Record<string, unknown>): void {
   ]);
 }
 
-function expectRequestContextRequired(statusCode: number, body: Record<string, unknown>): void {
+function expectRequestContextRequired(
+  statusCode: number,
+  body: Record<string, unknown>
+): void {
   expect(statusCode).toBe(401);
-  expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+  expect(body.code).toBe("REQUEST_CONTEXT_REQUIRED");
+  expect(body.statusCode).toBe(401);
+  expect(typeof body.message).toBe("string");
+  expect(typeof body.correlationId).toBe("string");
+  expect(body.correlationId).not.toHaveLength(0);
+  expect(body.error).toBeUndefined();
 }
 
 afterEach(async () => {
