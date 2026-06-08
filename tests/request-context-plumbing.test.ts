@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest, InjectOptions } from "fastify";
 
 import { buildApp } from "../src/app.js";
 import {
@@ -36,6 +36,28 @@ function buildAppWithHarness(): FastifyInstance {
   return app;
 }
 
+async function injectAndParse(app: FastifyInstance, options: InjectOptions) {
+  const response = await app.inject(options);
+  return { statusCode: response.statusCode, body: response.json() };
+}
+
+function expectHealthyBody(body: Record<string, unknown>): void {
+  expect(body.status).toBe("ok");
+  expect(body.service).toBe("nashir-backend");
+  expect(body.runtime).toBe("node");
+  expect(sortAlphabetically(Object.keys(body))).toEqual([
+    "runtime",
+    "service",
+    "status",
+    "uptimeSeconds"
+  ]);
+}
+
+function expectRequestContextRequired(statusCode: number, body: Record<string, unknown>): void {
+  expect(statusCode).toBe(401);
+  expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+}
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
@@ -44,30 +66,20 @@ describe("/health route preservation under request-context plumbing", () => {
   it("remains ungated and responds identically without request-context headers", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: "/health"
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
-    expect(body.status).toBe("ok");
-    expect(body.service).toBe("nashir-backend");
-    expect(body.runtime).toBe("node");
+    expect(statusCode).toBe(200);
     expect(typeof body.uptimeSeconds).toBe("number");
-    expect(sortAlphabetically(Object.keys(body))).toEqual([
-      "runtime",
-      "service",
-      "status",
-      "uptimeSeconds"
-    ]);
+    expectHealthyBody(body);
   });
 
   it("remains ungated and identical even when request-context headers are present", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: "/health",
       headers: {
@@ -77,54 +89,31 @@ describe("/health route preservation under request-context plumbing", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
-    expect(body.status).toBe("ok");
-    expect(body.service).toBe("nashir-backend");
-    expect(body.runtime).toBe("node");
-    expect(sortAlphabetically(Object.keys(body))).toEqual([
-      "runtime",
-      "service",
-      "status",
-      "uptimeSeconds"
-    ]);
+    expect(statusCode).toBe(200);
+    expectHealthyBody(body);
   });
 
   it("remains ungated when called with a query string", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: "/health?probe=1"
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
-    expect(body.status).toBe("ok");
-    expect(body.service).toBe("nashir-backend");
-    expect(body.runtime).toBe("node");
-    expect(sortAlphabetically(Object.keys(body))).toEqual([
-      "runtime",
-      "service",
-      "status",
-      "uptimeSeconds"
-    ]);
+    expect(statusCode).toBe(200);
+    expectHealthyBody(body);
   });
 
   it("does not match the /health route (no trailing-slash normalization configured) and is therefore gated like any other unmatched path, not treated as /health", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: "/health/"
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
   });
 });
 
@@ -132,15 +121,12 @@ describe("request-context plumbing on a gated non-health harness route", () => {
   it("rejects requests missing both request-context headers with the consistent error shape", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
     expect(typeof body.message).toBe("string");
     expect(typeof body.correlationId).toBe("string");
     expect(body.correlationId.length).toBeGreaterThan(0);
@@ -149,7 +135,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
   it("rejects requests with a blank workspace-id header with the consistent error shape", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -158,17 +144,14 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
     expect(typeof body.correlationId).toBe("string");
   });
 
   it("rejects requests missing only the actor-id header with the consistent error shape", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -176,16 +159,13 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
   });
 
   it("echoes a caller-supplied correlation id back in the error response", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -193,16 +173,14 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
+    expect(statusCode).toBe(401);
     expect(body.correlationId).toBe("caller-supplied-correlation-id");
   });
 
   it("succeeds and attaches the resolved request context when both headers are valid", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -211,9 +189,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
+    expect(statusCode).toBe(200);
     expect(body.workspaceId).toBe("workspace-123");
     expect(body.actorId).toBe("actor-456");
     expect(typeof body.correlationId).toBe("string");
@@ -223,7 +199,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
   it("propagates a caller-supplied correlation id through to a successful response", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -233,49 +209,41 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
+    expect(statusCode).toBe(200);
     expect(body.correlationId).toBe("caller-supplied-correlation-id");
   });
 
   it("rejects a gated request with a malformed JSON body before any parsing occurs", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "POST",
       url: TEST_HARNESS_ROUTE,
       payload: "{not-valid-json",
       headers: { "content-type": "application/json" }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
   });
 
   it("rejects a gated request with an oversized body before any parsing occurs", async () => {
     const app = buildAppWithHarness();
     const oversizedPayload = "x".repeat(2 * 1024 * 1024);
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "POST",
       url: TEST_HARNESS_ROUTE,
       payload: oversizedPayload,
       headers: { "content-type": "text/plain" }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(401);
-    expect(body.error).toBe("REQUEST_CONTEXT_REQUIRED");
+    expectRequestContextRequired(statusCode, body);
   });
 
   it("generates a correlation id when the caller does not supply one", async () => {
     const app = buildAppWithHarness();
 
-    const response = await app.inject({
+    const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
       url: TEST_HARNESS_ROUTE,
       headers: {
@@ -284,9 +252,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    const body = response.json();
-
-    expect(response.statusCode).toBe(200);
+    expect(statusCode).toBe(200);
     expect(typeof body.correlationId).toBe("string");
     expect(body.correlationId.length).toBeGreaterThan(0);
   });
