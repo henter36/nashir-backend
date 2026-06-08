@@ -9,6 +9,8 @@ import {
 } from "../src/request-context.js";
 
 const TEST_HARNESS_ROUTE = "/__test/request-context";
+const THROWING_HARNESS_ROUTE = "/__test/throw";
+const THROWN_ERROR_MESSAGE = "internal-test-thrown-error-detail";
 
 const BOTH_CONTEXT_HEADERS_MISSING_DETAILS = {
   missing: [WORKSPACE_ID_HEADER, ACTOR_ID_HEADER],
@@ -42,6 +44,10 @@ async function harnessHandler(request: FastifyRequest) {
   };
 }
 
+async function throwingHandler(): Promise<never> {
+  throw new Error(THROWN_ERROR_MESSAGE);
+}
+
 function buildAppWithHarness(): FastifyInstance {
   const app = buildApp({ logger: false });
 
@@ -49,6 +55,10 @@ function buildAppWithHarness(): FastifyInstance {
   // body tests prove gating happens before Fastify attempts to parse a body.
   app.get(TEST_HARNESS_ROUTE, harnessHandler);
   app.post(TEST_HARNESS_ROUTE, harnessHandler);
+
+  // Exercises the generic error handler: a route that always throws so the
+  // 500 ErrorModel response can be asserted without relying on a real fault.
+  app.get(THROWING_HARNESS_ROUTE, throwingHandler);
 
   apps.push(app);
   return app;
@@ -69,6 +79,22 @@ function expectHealthyBody(body: Record<string, unknown>): void {
     "status",
     "uptimeSeconds"
   ]);
+}
+
+function expectInternalServerError(
+  statusCode: number,
+  body: Record<string, unknown>
+): void {
+  expect(statusCode).toBe(500);
+  expect(body.code).toBe("INTERNAL_SERVER_ERROR");
+  expect(body.message).toBe("Internal server error.");
+  expect(body.statusCode).toBe(500);
+  expect(typeof body.correlationId).toBe("string");
+  expect(body.correlationId).not.toHaveLength(0);
+  expect(body.error).toBeUndefined();
+  expect(body.stack).toBeUndefined();
+  expect(body.details).toBeUndefined();
+  expect(JSON.stringify(body)).not.toContain(THROWN_ERROR_MESSAGE);
 }
 
 function expectNotFound(
@@ -205,6 +231,40 @@ describe("not-found handling via the internal ErrorModel serializer", () => {
     });
 
     expectNotFound(statusCode, body);
+  });
+});
+
+describe("internal server error handling via the internal ErrorModel serializer", () => {
+  it("returns an ErrorModel 500 for a thrown error without leaking internal details", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: THROWING_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expectInternalServerError(statusCode, body);
+  });
+
+  it("propagates a caller-supplied correlation id through to the 500 response", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: THROWING_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [CORRELATION_ID_HEADER]: "caller-supplied-correlation-id"
+      }
+    });
+
+    expectInternalServerError(statusCode, body);
+    expect(body.correlationId).toBe("caller-supplied-correlation-id");
   });
 });
 
