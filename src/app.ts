@@ -21,6 +21,26 @@ declare module "fastify" {
 }
 
 const HEALTH_ROUTE = "/health";
+const WORKSPACE_ROUTE_HARNESS_ROUTE =
+  "/internal/workspace-route-harness/:workspaceId";
+
+interface WorkspaceRouteHarnessParams {
+  workspaceId: string;
+}
+
+async function workspaceRouteHarnessHandler(
+  request: FastifyRequest<{ Params: WorkspaceRouteHarnessParams }>
+) {
+  return {
+    ok: true,
+    workspaceId: request.params.workspaceId,
+    requestContext: {
+      workspaceId: request.requestContext?.workspaceId ?? null,
+      actorId: request.requestContext?.actorId ?? null
+    },
+    correlationId: request.correlationId ?? null
+  };
+}
 
 function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
   const raw = headers[CORRELATION_ID_HEADER];
@@ -33,8 +53,16 @@ function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
   return randomUUID();
 }
 
-export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true, ...opts });
+export interface BuildAppOptions extends FastifyServerOptions {
+  // Internal-only diagnostic routes (e.g. the workspace route harness) are
+  // opt-in and disabled by default so they are never exposed by accident in
+  // normal runtime use; callers must explicitly enable them.
+  enableInternalHarnessRoutes?: boolean;
+}
+
+export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
+  const { enableInternalHarnessRoutes, ...fastifyOpts } = opts;
+  const app = Fastify({ logger: true, ...fastifyOpts });
 
   app.decorateRequest("requestContext", undefined);
   app.decorateRequest("correlationId", undefined);
@@ -80,6 +108,14 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     runtime: "node",
     uptimeSeconds: process.uptime()
   }));
+
+  // Read-only harness proving request-context plumbing reaches a real route:
+  // it echoes back the route param alongside the gated request context and
+  // correlation id, without touching auth, permissions, or any data layer.
+  // Opt-in only -- disabled by default so it is never exposed by accident.
+  if (enableInternalHarnessRoutes === true) {
+    app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+  }
 
   app.setNotFoundHandler(async (request, reply) => {
     const errorResponse = createHttpErrorResponse({
