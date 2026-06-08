@@ -48,8 +48,10 @@ async function throwingHandler(): Promise<never> {
   throw new Error(THROWN_ERROR_MESSAGE);
 }
 
-function buildAppWithHarness(): FastifyInstance {
-  const app = buildApp({ logger: false });
+function buildAppWithHarness(
+  options: { enableInternalHarnessRoutes?: boolean } = {}
+): FastifyInstance {
+  const app = buildApp({ logger: false, ...options });
 
   // GET covers header-only assertions; POST lets the malformed/oversized
   // body tests prove gating happens before Fastify attempts to parse a body.
@@ -272,8 +274,23 @@ describe("internal workspace route harness", () => {
   const WORKSPACE_ROUTE_HARNESS_PATH =
     "/internal/workspace-route-harness/workspace-123";
 
-  it("rejects requests missing request-context headers with the existing 401 ErrorModel shape", async () => {
+  it("is not registered by default and falls through to the existing 404 ErrorModel behavior", async () => {
     const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: WORKSPACE_ROUTE_HARNESS_PATH,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expectNotFound(statusCode, body);
+  });
+
+  it("rejects requests missing request-context headers with the existing 401 ErrorModel shape", async () => {
+    const app = buildAppWithHarness({ enableInternalHarnessRoutes: true });
 
     const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
@@ -284,7 +301,7 @@ describe("internal workspace route harness", () => {
   });
 
   it("succeeds with valid request-context headers", async () => {
-    const app = buildAppWithHarness();
+    const app = buildAppWithHarness({ enableInternalHarnessRoutes: true });
 
     const { statusCode } = await injectAndParse(app, {
       method: "GET",
@@ -299,7 +316,7 @@ describe("internal workspace route harness", () => {
   });
 
   it("includes the route workspaceId, requestContext, and correlationId in the success response", async () => {
-    const app = buildAppWithHarness();
+    const app = buildAppWithHarness({ enableInternalHarnessRoutes: true });
 
     const { statusCode, body } = await injectAndParse(app, {
       method: "GET",
@@ -322,7 +339,7 @@ describe("internal workspace route harness", () => {
   });
 
   it("propagates a caller-supplied correlation id through to the success response", async () => {
-    const app = buildAppWithHarness();
+    const app = buildAppWithHarness({ enableInternalHarnessRoutes: true });
 
     const { statusCode, body } = await injectAndParse(app, {
       method: "GET",

@@ -53,8 +53,16 @@ function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
   return randomUUID();
 }
 
-export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
-  const app = Fastify({ logger: true, ...opts });
+export interface BuildAppOptions extends FastifyServerOptions {
+  // Internal-only diagnostic routes (e.g. the workspace route harness) are
+  // opt-in and disabled by default so they are never exposed by accident in
+  // normal runtime use; callers must explicitly enable them.
+  enableInternalHarnessRoutes?: boolean;
+}
+
+export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
+  const { enableInternalHarnessRoutes, ...fastifyOpts } = opts;
+  const app = Fastify({ logger: true, ...fastifyOpts });
 
   app.decorateRequest("requestContext", undefined);
   app.decorateRequest("correlationId", undefined);
@@ -104,7 +112,10 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
   // Read-only harness proving request-context plumbing reaches a real route:
   // it echoes back the route param alongside the gated request context and
   // correlation id, without touching auth, permissions, or any data layer.
-  app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+  // Opt-in only -- disabled by default so it is never exposed by accident.
+  if (enableInternalHarnessRoutes === true) {
+    app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+  }
 
   app.setNotFoundHandler(async (request, reply) => {
     const errorResponse = createHttpErrorResponse({
