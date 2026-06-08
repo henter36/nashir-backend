@@ -10,6 +10,24 @@ import {
 
 const TEST_HARNESS_ROUTE = "/__test/request-context";
 
+const BOTH_CONTEXT_HEADERS_MISSING_DETAILS = {
+  missing: [WORKSPACE_ID_HEADER, ACTOR_ID_HEADER],
+  issues: [
+    { header: WORKSPACE_ID_HEADER, reason: "missing" },
+    { header: ACTOR_ID_HEADER, reason: "missing" }
+  ]
+};
+
+const BLANK_WORKSPACE_CONTEXT_DETAILS = {
+  missing: [WORKSPACE_ID_HEADER],
+  issues: [{ header: WORKSPACE_ID_HEADER, reason: "blank" }]
+};
+
+const MISSING_ACTOR_CONTEXT_DETAILS = {
+  missing: [ACTOR_ID_HEADER],
+  issues: [{ header: ACTOR_ID_HEADER, reason: "missing" }]
+};
+
 const apps: FastifyInstance[] = [];
 
 function sortAlphabetically(values: string[]): string[] {
@@ -55,7 +73,8 @@ function expectHealthyBody(body: Record<string, unknown>): void {
 
 function expectRequestContextRequired(
   statusCode: number,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  expectedDetails: unknown = BOTH_CONTEXT_HEADERS_MISSING_DETAILS
 ): void {
   expect(statusCode).toBe(401);
   expect(body.code).toBe("REQUEST_CONTEXT_REQUIRED");
@@ -64,6 +83,7 @@ function expectRequestContextRequired(
   expect(typeof body.correlationId).toBe("string");
   expect(body.correlationId).not.toHaveLength(0);
   expect(body.error).toBeUndefined();
+  expect(body.details).toEqual(expectedDetails);
 }
 
 afterEach(async () => {
@@ -152,7 +172,11 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    expectRequestContextRequired(statusCode, body);
+    expectRequestContextRequired(
+      statusCode,
+      body,
+      BLANK_WORKSPACE_CONTEXT_DETAILS
+    );
     expect(typeof body.correlationId).toBe("string");
   });
 
@@ -167,7 +191,11 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       }
     });
 
-    expectRequestContextRequired(statusCode, body);
+    expectRequestContextRequired(
+      statusCode,
+      body,
+      MISSING_ACTOR_CONTEXT_DETAILS
+    );
   });
 
   it("echoes a caller-supplied correlation id back in the error response", async () => {
