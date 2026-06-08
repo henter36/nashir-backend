@@ -93,5 +93,23 @@ export function buildApp(opts: FastifyServerOptions = {}): FastifyInstance {
     return reply.code(errorResponse.statusCode).send(errorResponse.body);
   });
 
+  // Catches thrown/unexpected errors only -- the request-context 401 and
+  // not-found 404 responses above are sent directly via reply.send and never
+  // reach this handler. The thrown error's message and stack are deliberately
+  // discarded so internal details are never leaked to the client.
+  app.setErrorHandler(async (error, request, reply) => {
+    request.log.error(error);
+
+    const errorResponse = createHttpErrorResponse({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Internal server error.",
+      statusCode: 500,
+      correlationId:
+        request.correlationId ?? resolveCorrelationId(request.headers)
+    });
+
+    return reply.code(errorResponse.statusCode).send(errorResponse.body);
+  });
+
   return app;
 }
