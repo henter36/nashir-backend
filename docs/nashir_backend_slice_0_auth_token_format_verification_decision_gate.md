@@ -131,7 +131,7 @@ The following claims are the only claims the backend trusts from the JWT. This c
 |---|---|---|
 | Subject / user ID | `sub` | Only verified identity claim trusted for enforcement. Mapped to `requestContext.actorId`. |
 | Issuer | `iss` | Validated against configured issuer during verification. Not used after validation. |
-| Audience | `aud` | Validated against configured audience during verification. Audience value is an unresolved decision (Section 9). |
+| Audience | `aud` | Validated against configured audience during verification. Audience value is an unresolved decision (Section 11). |
 | Expiration | `exp` | Mandatory validation — tokens past their expiration are rejected. |
 | Issued-at | `iat` | Validated as a sanity check — tokens issued significantly in the future indicate clock skew or token manipulation. |
 | Email | `email` | Optional and non-authoritative. If present, may be used for display or logging only. Must not be used as the primary identity for enforcement; `sub` is authoritative. |
