@@ -17,7 +17,7 @@
 
 PR #37 merged the Backend Slice 0 Auth/RBAC Source-of-Truth Decision Gate. That gate recorded six binding source-of-truth decisions, elevated the `grantedPermissions`-never-caller-supplied invariant to a durable gate-level decision, enumerated the full `ErrorModel` field-name divergence, defined the `x-workspace-scope: route` / path-param vs. header design decision, and specified the scope of the next planning gate.
 
-This review gate independently verifies those six decisions and all supporting claims against the same authority inputs, live source files, and the PR #37 commit record. It does not rely on the decision gate's self-assessment. It produces a 15-criterion PASS/FAIL matrix and a GO / NO-GO decision.
+This review gate independently verifies those six decisions and all supporting claims against the same authority inputs, live source files, and the PR #37 commit record. It does not rely on the decision gate's self-assessment. It produces a 13-criterion PASS/FAIL matrix and a GO / NO-GO decision.
 
 ---
 
