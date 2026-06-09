@@ -108,7 +108,7 @@ The following claims must be ignored by the backend in V1, regardless of whether
 | `app_metadata` | Management metadata | Not an authorization source |
 | `user_metadata` | User-supplied metadata | Never used for authorization |
 
-Default-deny rule: any claim not listed in Decision 3 or Decision 4 of this gate is excluded.
+Default-deny rule: any payload claim not listed in Decision 3 of this gate is excluded.
 
 ---
 
@@ -150,6 +150,7 @@ After workspace resolution, `evaluatePermissionGuard` remains the only call site
 | Expired token | 401 |
 | Missing or blank `sub` | 401 |
 | Unknown `kid` after JWKS refresh | 401 |
+| Missing `kid` header parameter | 401 |
 | JWKS endpoint unavailable | 503 Service Unavailable or 502 Bad Gateway |
 
 JWKS endpoint failure returns 503/502 because it is a backend infrastructure failure, not a token authentication failure. 401 is not permitted for JWKS retrieval failures.
@@ -158,9 +159,9 @@ Error response body shape must align with the authority `ErrorModel`. Exact fiel
 
 ---
 
-### Decision 10 — `x-nashir-actor-id` remains transitional, test-harness only
+### Decision 10 — `x-nashir-actor-id` and `x-nashir-workspace-id` remain transitional, test-harness only
 
-The `x-nashir-actor-id` header is the current harness-era identity source. It must not be used as a verified identity source in any real enforcement context (Decision 1, PR #37). The execution planning gate must plan its removal from the production request path and ensure it is never consulted by `authGuard` or any downstream guard as a trust source.
+The `x-nashir-actor-id` and `x-nashir-workspace-id` headers are current harness-era context sources. They must not be used as verified sources in any real enforcement context (Decision 1, PR #37; Decision 7 of this gate). The execution planning gate must plan their removal from the production request path and ensure they are never consulted by `authGuard`, `workspaceContextGuard`, `permissionGuard`, or any downstream guard as trust sources.
 
 ---
 
