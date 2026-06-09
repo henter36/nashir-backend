@@ -54,7 +54,7 @@ Provider selection gate header: "Implementation authorization: None." Section 7 
 
 The token format decision gate (PR #41) bound the project to JWT with JWKS verification. Auth0 satisfies both requirements: it issues signed JWTs and exposes a standard JWKS endpoint (`https://<tenant>.auth0.com/.well-known/jwks.json`).
 
-The provider selection gate Section 4 lists the trusted claims as `iss`, `aud`, `sub`, `exp`, `iat`, `kid` — exactly matching PR #41 Section 6's binding claim set (`iss`, `aud`, `sub`, `exp`, `iat` as the validation and identity claims, plus `kid` added here as the JWKS key selection mechanism). The additions (`kid`) are a natural Auth0-specific elaboration, not a contradiction. No claim from PR #41's allowed set is removed or re-scoped.
+The provider selection gate Section 4 lists the validated token fields as `iss`, `aud`, `sub`, `exp`, `iat`, and `kid`. This aligns with PR #41 Section 6's binding set: `iss`, `aud`, `sub`, `exp`, and `iat` are JWT payload claims used for validation and identity binding, while `kid` is a JOSE/JWT header parameter used only for JWKS key selection. Adding `kid` as a key-selection header parameter is an Auth0-specific elaboration, not a contradiction. No claim from PR #41's allowed payload claim set is removed or re-scoped.
 
 **Result: PASS**
 
