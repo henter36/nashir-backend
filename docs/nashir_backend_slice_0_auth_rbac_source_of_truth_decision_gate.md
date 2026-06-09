@@ -340,16 +340,16 @@ grep -n "evaluatePermissionGuard" src/app.ts src/index.ts
 grep -n "code\|correlationId\|statusCode\|retryable\|requestId" src/error-model.ts
 
 # Confirm authority ErrorModel requires errorCode, requestId, retryable, status
-grep -A 10 "ErrorModel:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml | grep "required\|errorCode\|requestId\|retryable\|status"
+grep -A 10 "ErrorModel:" ../nashir/docs/nashir_v1_openapi.yaml | grep "required\|errorCode\|requestId\|retryable\|status"
 
 # Confirm authority bearer scheme defers provider and token format
-grep -A 5 "bearerAuth:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml
+grep -A 5 "bearerAuth:" ../nashir/docs/nashir_v1_openapi.yaml
 
 # Confirm authority requires server-side membership resolution
-grep -A 8 "bearerAuth:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml
+grep -A 8 "bearerAuth:" ../nashir/docs/nashir_v1_openapi.yaml
 
 # Confirm x-workspace-scope: route annotation is present on workspace-scoped routes
-grep -n "x-workspace-scope" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml | head -5
+grep -n "x-workspace-scope" ../nashir/docs/nashir_v1_openapi.yaml | head -5
 
 # Confirm no product routes
 grep -E -n "app\.(post|put|delete|patch)" src/app.ts
