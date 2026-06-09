@@ -107,7 +107,7 @@ Token verification failures must produce appropriate HTTP responses. Error respo
 | Audience mismatch | 401 |
 | Missing `sub` | 401 |
 | Unknown `kid` after JWKS refresh | 401 |
-| JWKS endpoint unavailable | 503 (or 401 — deferred to execution planning gate) |
+| JWKS endpoint unavailable | 503 Service Unavailable or 502 Bad Gateway; 401 is not allowed for JWKS retrieval failures. |
 
 ---
 
@@ -185,7 +185,9 @@ Authorization: Bearer <JWT>
 
 ### 7.4 `requestContext` evolution
 
-The current `RequestContext { workspaceId: string; actorId: string }` shape satisfies the post-verification pipeline. No new fields are required in `RequestContext` to support the `authGuard` layer. `workspaceId` continues to be sourced from the route path parameter, not from the token.
+The current `RequestContext { workspaceId: string; actorId: string }` shape satisfies the fully resolved post-authentication and post-workspace pipeline only. Because `authGuard` runs before `workspaceContextGuard`, `authGuard` must not initialize or expose a fully resolved `RequestContext` before `workspaceId` is resolved from the route path parameter.
+
+Execution planning must preserve type safety by defining a progressive request context boundary, such as a verified identity context containing `actorId` after token verification and a fully resolved request context containing both `actorId` and `workspaceId` only after workspace resolution. Making `workspaceId` appear verified before `workspaceContextGuard` completes is not allowed.
 
 The `x-nashir-actor-id` header remains present as a transitional harness mechanism. It must not be used as a verified identity source in any real enforcement context (Decision 1, PR #37). The execution planning gate must plan its removal from the production request path.
 
@@ -206,6 +208,7 @@ All nine decisions below are explicitly unresolved by this gate. Each must be ad
 | 7 | **Local test token strategy** | How signed test JWTs are generated without a live Auth0 tenant. Established approach (PR #41): locally generated RSA key pair with a mock JWKS fixture. Specific tooling (test helper, fixture file, generation script) deferred to execution planning gate. |
 | 8 | **Environment variable names** | Variable names for: Auth0 issuer URL, Auth0 audience, JWKS URI (or derivable from issuer), and any other verification configuration. |
 | 9 | **JWT verification library** | The npm package used to verify JWTs and fetch/cache JWKS keys. Leading candidate: `jose` (Web Crypto API-based, standards-aligned, no native bindings). Alternatives (`jsonwebtoken` + manual JWKS, Auth0 SDK) must be evaluated against the no-native-bindings and minimal-dependency constraints before selection. Library selection must happen in the execution planning gate, not here. |
+| 10 | **Clock skew / leeway** | The maximum allowed clock drift when validating temporal token fields such as `exp`, `iat`, and any future `nbf`. Execution planning must define the exact leeway value and ensure the selected JWT verification library enforces it consistently. |
 
 ---
 
