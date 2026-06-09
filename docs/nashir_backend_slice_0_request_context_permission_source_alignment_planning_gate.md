@@ -341,10 +341,10 @@ grep -E -n "app\.(post|put|delete|patch)" src/app.ts
 grep -n "FORBIDDEN\|NOT_FOUND\|permission.denied\|resource.not_found" src/permission-guard.ts
 
 # Confirm authority ErrorCode enum values
-grep -A 20 "ErrorCode:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml | grep "^\s*-"
+grep -A 20 "ErrorCode:" ../nashir/docs/nashir_v1_openapi.yaml | grep "^\s*-"
 
 # Confirm authority security scheme is bearer (deferred provider)
-grep -A 6 "bearerAuth:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml
+grep -A 6 "bearerAuth:" ../nashir/docs/nashir_v1_openapi.yaml
 
 # Confirm contract_reference.md records PENDING ALIGNMENT
 grep -n "PENDING ALIGNMENT" docs/contract_reference.md
