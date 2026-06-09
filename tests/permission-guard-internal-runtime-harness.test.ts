@@ -180,8 +180,9 @@ describe("permission guard internal runtime harness", () => {
         headers: CONTEXT_HEADERS
       });
 
-      expect("grantedPermissions" in body).toBe(false);
-      expect("grantedPermissions" in body.decision).toBe(false);
+      expect(body).not.toHaveProperty("grantedPermissions");
+      expect(body.decision).toBeDefined();
+      expect(body.decision).not.toHaveProperty("grantedPermissions");
       // The unrequested fixture permission must not appear anywhere in the response
       expect(JSON.stringify(body)).not.toContain(
         UNREQUESTED_FIXTURE_PERMISSION
