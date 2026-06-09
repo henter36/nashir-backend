@@ -4,8 +4,8 @@
 |---|---|
 | Gate type | Documentation-only planning review gate |
 | Authorization source | `docs/nashir_backend_slice_0_auth0_token_verification_planning_gate.md` (PR #45) |
-| PR #45 merge commit (token verification planning gate) | `99e26c6` |
-| PR #44 merge commit (provider selection review gate) | `d2cd43d` |
+| PR #45 merge commit (token verification planning gate) | `99e26c6dcce8f94a27ebabf68101f3f03b4121ea` |
+| PR #44 merge commit (provider selection review gate) | `d2cd43dfc8a775c841f85daa21fa5f5369b48b60` |
 | PR #43 merge commit (provider selection gate) | `00f1a384221e8578a83777ced9acdd2f14db5e7f` |
 | PR #41 merge commit (token format decision gate) | `3eb49e632b7754feccae076c99055dacea194480` |
 | Authority repository | `henter36/nashir` |
