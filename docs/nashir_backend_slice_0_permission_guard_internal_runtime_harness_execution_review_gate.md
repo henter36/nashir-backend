@@ -400,10 +400,10 @@ NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts
 git show --name-only --format=short 1b23ed0db4329549744fa515d39b357efe9dd309
 
 # Confirm evaluatePermissionGuard has exactly one call site in runtime source
-grep -n "evaluatePermissionGuard" src/app.ts src/index.ts
+grep -n "evaluatePermissionGuard(" src/app.ts src/index.ts
 
 # Confirm createHttpErrorResponse is not in the handler (lines 57-79)
-grep -n "createHttpErrorResponse\|createErrorModel" src/app.ts
+grep -E -n "createHttpErrorResponse|createErrorModel" src/app.ts
 
 # Confirm route list — exactly 3 routes (health, workspace harness gated, pg harness gated)
 grep -E -n "app\.(get|post|put|delete|patch)" src/app.ts
