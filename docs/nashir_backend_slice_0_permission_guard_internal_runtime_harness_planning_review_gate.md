@@ -41,7 +41,7 @@ This is a documentation-only review/acceptance gate. It does not modify any sour
 
 ## 3. Review Criteria
 
-This review checks PR #30's planning gate against fourteen criteria, each resolved in the Review Matrix (Section 10):
+This review checks PR #30's planning gate against fourteen criteria, each resolved in the Review Matrix (Section 11):
 
 1. PR #30 remains strictly documentation-only: it proposes only one narrow internal diagnostic harness route and makes no source-code, test, or configuration change
 2. The planned route is opt-in and disabled by default
@@ -55,8 +55,8 @@ This review checks PR #30's planning gate against fourteen criteria, each resolv
 10. PR #29 Section 9 non-authorization boundaries were carried forward correctly and completely
 11. All five required risk controls are present, concrete, and checkable: premature runtime wiring, false sense of authorization, `ErrorCode` authority mismatch, permission-source ambiguity, accidental harness exposure
 12. No wording in the plan could reasonably be misread as authorizing implementation
-13. A clear PASS/FAIL matrix is produced (Section 10 of this gate)
-14. A clear GO/NO-GO decision is reached (Section 11 of this gate)
+13. A clear PASS/FAIL matrix is produced (Section 11 of this gate)
+14. A clear GO/NO-GO decision is reached (Section 12 of this gate)
 
 ---
 
@@ -189,7 +189,7 @@ This section reports any wording in PR #30's planning gate that could reasonably
 
 **Section 3.3 handler sketch.** PR #30 Sections 3.3, 3.5, 3.6, and 4 contain detailed TypeScript type sketches and a full `async function permissionGuardHarnessHandler(...)` body. These are detailed enough that a reader could, in principle, copy the text into `src/app.ts`. Two safeguards are in place: (a) Section 3.3 states explicitly: "This sketch is illustrative of the *shape* a future execution gate would refine — not a final signature, and not something this gate authorizes anyone to type into `src/app.ts`"; (b) Section 9 adds a harness-specific prohibition: "actually writing, editing, or scaffolding any of the code sketched in Sections 3–4" is listed verbatim in the non-authorization boundary. The naming of the sketches ("illustrative only — not authorized to build") in Section 4's table heading also reinforces this. The hedging is present, explicit, and consistently applied. **No material ambiguity; minor note only: the hedging language in Section 3.3 and the Section 9 line are load-bearing and must survive verbatim into the execution gate's scope statement.**
 
-**Section 10 GO decision.** The GO statement ("GO to a Backend Slice 0 Permission Guard Internal Runtime Harness Execution Gate — scoped to exactly one internal, opt-in diagnostic route") could be read, in isolation, as "build it now." The sentence that immediately follows ("This gate authorizes no source-code change of any kind. It authorizes only the opening of the execution gate named in Section 11") disambiguates this clearly — the GO is to *open* the execution gate, not to build anything. **No material ambiguity.**
+**Section 10 GO decision.** The GO statement ("GO to a Backend Slice 0 Permission Guard Internal Runtime Harness Execution Gate — scoped to exactly one internal, opt-in diagnostic route") could be read, in isolation, as "build it now." The sentence that immediately follows ("This gate authorizes no source-code change of any kind. It authorizes only the opening of the execution gate named in Section 13") disambiguates this clearly — the GO is to *open* the execution gate, not to build anything. **No material ambiguity.**
 
 **Section 9, first bullet, carve-out clause.** The carve-out "— **other than the single, narrow, opt-in, diagnostic route this plan describes**, and even that route only once a separate execution gate explicitly authorizes building it" modifies the inherited PR #29 prohibition on wiring `permission-guard` into route handlers. A reader who reads only the bolded text could read this as "this plan authorizes wiring permission-guard into a route handler." The full sentence includes both conditions (narrow/opt-in/diagnostic + separate execution gate), and the Section 9 header makes clear "this planning gate does not authorize" any of the listed items. The carve-out's double conditioning ("and even that route only once a separate execution gate explicitly authorizes building it") makes the timing clear. **No material ambiguity; the double condition is necessary and correctly stated.**
 
