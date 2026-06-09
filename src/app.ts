@@ -7,6 +7,7 @@ import Fastify, {
 } from "fastify";
 
 import { createHttpErrorResponse } from "./error-model.js";
+import { evaluatePermissionGuard } from "./permission-guard.js";
 import {
   CORRELATION_ID_HEADER,
   resolveRequestContextFromHeaders,
@@ -23,9 +24,20 @@ declare module "fastify" {
 const HEALTH_ROUTE = "/health";
 const WORKSPACE_ROUTE_HARNESS_ROUTE =
   "/internal/workspace-route-harness/:workspaceId";
+const PERMISSION_GUARD_HARNESS_ROUTE =
+  "/internal/permission-guard-harness/:requiredPermission";
+
+const STATIC_HARNESS_GRANTED_PERMISSIONS = Object.freeze([
+  "harness.read",
+  "harness.write"
+]);
 
 interface WorkspaceRouteHarnessParams {
   workspaceId: string;
+}
+
+interface PermissionGuardHarnessQuery {
+  disclosureMode?: string;
 }
 
 async function workspaceRouteHarnessHandler(
@@ -40,6 +52,30 @@ async function workspaceRouteHarnessHandler(
     },
     correlationId: request.correlationId ?? null
   };
+}
+
+async function permissionGuardHarnessHandler(
+  request: FastifyRequest<{
+    Params: { requiredPermission: string };
+    Querystring: PermissionGuardHarnessQuery;
+  }>
+) {
+  const disclosureMode =
+    request.query.disclosureMode === "non_disclosing"
+      ? "non_disclosing"
+      : "disclosing";
+
+  const decision = evaluatePermissionGuard({
+    requiredPermission: request.params.requiredPermission,
+    grantedPermissions: STATIC_HARNESS_GRANTED_PERMISSIONS,
+    requestContext: {
+      workspaceId: request.requestContext?.workspaceId ?? "",
+      actorId: request.requestContext?.actorId ?? ""
+    },
+    disclosureMode
+  });
+
+  return { ok: true, decision };
 }
 
 function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
@@ -58,10 +94,15 @@ export interface BuildAppOptions extends FastifyServerOptions {
   // opt-in and disabled by default so they are never exposed by accident in
   // normal runtime use; callers must explicitly enable them.
   enableInternalHarnessRoutes?: boolean;
+  enableInternalPermissionGuardHarnessRoutes?: boolean;
 }
 
 export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
-  const { enableInternalHarnessRoutes, ...fastifyOpts } = opts;
+  const {
+    enableInternalHarnessRoutes,
+    enableInternalPermissionGuardHarnessRoutes,
+    ...fastifyOpts
+  } = opts;
   const app = Fastify({ logger: true, ...fastifyOpts });
 
   app.decorateRequest("requestContext", undefined);
@@ -115,6 +156,10 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   // Opt-in only -- disabled by default so it is never exposed by accident.
   if (enableInternalHarnessRoutes === true) {
     app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+  }
+
+  if (enableInternalPermissionGuardHarnessRoutes === true) {
+    app.get(PERMISSION_GUARD_HARNESS_ROUTE, permissionGuardHarnessHandler);
   }
 
   app.setNotFoundHandler(async (request, reply) => {
