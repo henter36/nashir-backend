@@ -20,7 +20,7 @@
 
 PR #33's execution review gate confirmed all 15 criteria for PR #32 passed — the Backend Slice 0 Permission Guard Internal Runtime Harness is accepted as a diagnostic-only artifact and is on `main`. PR #33 recommended this follow-up decision gate to determine the shape of the next step.
 
-This gate does two things: (1) confirms what Slice 0 did and did not authorize, and (2) selects exactly one of four possible forward paths and documents why the others were not selected at this time. It does not implement anything, authorize implementation of anything, or open any execution gate directly. It opens only the one documentation-only planning gate named in Section 12, and that gate must itself remain planning-only.
+This gate does two things: (1) confirms what Slice 0 did and did not authorize, and (2) selects exactly one of four possible forward paths and documents why the others were not selected at this time. It does not implement anything, authorize implementation of anything, or open any execution gate directly. It opens only the one documentation-only planning gate named in Section 10, and that gate must itself remain planning-only.
 
 ---
 
@@ -125,7 +125,7 @@ The alignment between `requestContext { workspaceId, actorId }` and a real permi
 
 **Arguments against.** A planning gate delays implementation. If the direction is already obvious (e.g., a specific role-storage design is already decided externally), a planning gate produces documentation for a foregone conclusion.
 
-**Verdict: Selected.** The permission-source design question is not yet settled, the convention is not yet confirmed, and the `ErrorCode` alignment path is `PENDING`. A documentation-only planning gate directly addresses all three at low cost. See Section 12 for the precise scope of the recommended gate.
+**Verdict: Selected.** The permission-source design question is not yet settled, the convention is not yet confirmed, and the `ErrorCode` alignment path is `PENDING`. A documentation-only planning gate directly addresses all three at low cost. See Section 10 for the precise scope of the recommended gate.
 
 ### Path D — Real auth/RBAC integration planning
 
