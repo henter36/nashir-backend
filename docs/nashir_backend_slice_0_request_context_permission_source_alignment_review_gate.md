@@ -375,5 +375,5 @@ grep -E -n "app\.(post|put|delete|patch)" src/app.ts
 grep -n "PENDING ALIGNMENT" docs/contract_reference.md
 
 # Confirm authority ErrorCode enum and bearerAuth deferred language
-grep -A 4 "bearerAuth:" /Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml
+grep -A 4 "bearerAuth:" ../nashir/docs/nashir_v1_openapi.yaml
 ```
