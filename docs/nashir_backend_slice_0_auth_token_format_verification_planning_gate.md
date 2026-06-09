@@ -162,7 +162,7 @@ Four candidate models are evaluated. Each is assessed against six criteria relev
 |---|---|---|
 | Subject / user ID | `sub` | Maps directly to `requestContext.actorId`. This is the only verified identity claim the backend trusts for permission enforcement. |
 | Issuer | `iss` | Validated against the configured issuer string during JWT verification. Not used after validation. |
-| Audience | `aud` | Validated against the configured audience value(s) during JWT verification. The audience value for this backend is an unresolved decision (Section 9). |
+| Audience | `aud` | Validated against the configured audience value(s) during JWT verification. The audience value for this backend is an unresolved decision (Section 10). |
 | Expiration | `exp` | Validated as mandatory — tokens past their expiration must be rejected. |
 | Issued-at | `iat` | Validated as a sanity check — tokens issued in the future may indicate clock skew or token manipulation. |
 | Email | `email` | Optional, non-authoritative. May be present in the token but must not be used as the primary identity source. If used at all, it is for display/logging purposes only; `sub` is the authoritative identity. |
@@ -245,7 +245,7 @@ The following decisions are explicitly not resolved by this planning gate. Each 
 | 1 | **Token provider selection** | Auth0, AWS Cognito, Clerk, Okta, Firebase Authentication, Supabase Auth, Keycloak, or other. This is the highest-impact choice and depends on deployment environment, cost, team familiarity, and SLA requirements. Deferred to the auth implementation planning gate. |
 | 2 | **JWKS endpoint URI** | Depends on provider selection. The URI must be configurable (environment variable or config file) to support dev, staging, and production environments without code changes. |
 | 3 | **Token audience claim value(s)** | The `aud` claim value the backend validates against. This is typically a service identifier (e.g., `https://api.nashir.app` or a client ID). Must match what the selected provider issues. |
-| 4 | **Key rotation policy** | How frequently the provider rotates signing keys. The backend's JWKS cache TTL must be shorter than the rotation interval. The specific TTL and cache invalidation strategy depend on the provider's rotation policy. |
+| 4 | **Key rotation policy** | How frequently the provider rotates signing keys. The backend's JWKS cache TTL must be shorter than the rotation interval, and the verification layer should support rate-limited, on-demand JWKS refreshing when an unknown key ID (kid) is encountered. |
 | 5 | **Local test token strategy** | The mechanism for generating signed test JWTs in the test suite without a live auth provider. The planning direction (Model A) supports a locally generated key pair with a mock JWKS fixture. The specific implementation — test helper, key generation script, or fixture file — is a decision for the auth implementation planning gate. |
 | 6 | **Error response mapping for verification failures** | Token verification failures (missing token, expired, bad signature, wrong audience) must produce error responses. The HTTP status codes (401 for missing/invalid, 403 for wrong audience vs. permission denial) and the `ErrorModel` shape for these responses are constrained by the full `ErrorModel` alignment gap (Section 7 of the source-of-truth decision gate). These must not be implemented until the `ErrorModel` alignment gate resolves field names. |
 | 7 | **Token verification library** | The Node.js library used to verify JWTs and fetch JWKS. `jose` (pure ESM, no native bindings, standard-compliant, supports Node.js and edge runtimes) is a leading candidate but this is a decision for the implementation planning gate. Selection criteria: pure TypeScript/ESM, no native dependencies, standards-compliant, actively maintained. |
@@ -340,7 +340,7 @@ That review gate must be documentation-only and must carry forward this gate's S
 ## 15. Verification Commands
 
 ```bash
-cd ~/workspace/nashir-backend
+cd "20 20 12 61 79 80 81 98 701 33 100 204 250 395 398 399 400git rev-parse --show-toplevel)"
 
 git fetch origin --quiet
 git checkout main
@@ -356,7 +356,7 @@ npm test
 grep -n "interface RequestContext" src/request-context.ts
 
 # Confirm x-nashir-actor-id is still the only actorId source (harness-era state)
-grep -n "ACTOR_ID_HEADER\|actorId" src/request-context.ts
+grep -E -n "ACTOR_ID_HEADER|actorId" src/request-context.ts
 
 # Confirm grantedPermissions is never sourced from request headers
 grep -n "grantedPermissions" src/app.ts
