@@ -119,7 +119,7 @@ Reject with 401 on any failure.
 
 `iat` is a sanity check, not a hard trust boundary. Planned behavior:
 
-- If `iat` is present: reject if `iat` is more than `clock_skew_leeway * 2` seconds in the future (configurable)
+- If `iat` is present: reject if `iat` is more than `TOKEN_LEEWAY_SECONDS` seconds in the future (configurable). The same leeway value planned for `exp` validation must be used for `iat` future-drift validation to avoid custom temporal-claim behavior that conflicts with standard JWT verification library behavior.
 - If `iat` is absent: proceed without rejection — Auth0 includes `iat` by default; absence is unusual but not a security failure on its own
 - `iat` is never used to derive a session window; `exp` governs expiration
 
@@ -180,7 +180,7 @@ Eleven decisions were deferred in PR #47. This gate resolves or further bounds e
 | 1 | Auth0 tenant domain / issuer | **Deferred to env config** | Provided via `AUTH0_ISSUER_URL` at runtime. Format: `https://<tenant>.auth0.com/`. No default value; absence is a startup error. |
 | 2 | API audience value | **Deferred to env config** | Provided via `AUTH0_AUDIENCE` at runtime. No default; absence is a startup error. |
 | 3 | JWKS URI | **Resolved: derivable** | Default derivation: `${AUTH0_ISSUER_URL}.well-known/jwks.json`. Can be overridden via `AUTH0_JWKS_URI` for custom domains. |
-| 4 | JWKS cache TTL | **Resolved: 10 minutes** | Default `JWKS_CACHE_TTL_SECONDS=600`. Strictly less than Auth0's default key rotation interval (typically 30 days). Configurable per deployment. |
+| 4 | JWKS cache TTL | **Resolved: 10 minutes** | Default `JWKS_CACHE_TTL_SECONDS=600`. Configurable per deployment. If the selected JWT library is `jose` with `createRemoteJWKSet`, execution planning must account for the library's caching behavior explicitly: a strict TTL requires a wrapper, controlled re-initialization of the remote JWK set, or an equivalent cache-boundary mechanism. Unknown `kid` refresh behavior and refresh cooldown must be planned separately from TTL. |
 | 5 | Token TTL assumptions | **Noted; not configurable here** | Auth0 access token TTL is set in the Auth0 API settings. Backend assumes tokens may be short-lived (minutes) to medium-lived (hours). Execution gate must not assume any specific TTL. |
 | 6 | Key rotation behavior | **Resolved: rate-limited on-demand** | On `kid` cache miss: re-fetch JWKS once; cap at 1 re-fetch per `kid` per 5-minute window (configurable via `JWKS_REFRESH_COOLDOWN_SECONDS=300`). |
 | 7 | Local test token strategy | **Resolved: RSA key pair + mock JWKS** | See Section 9. |
@@ -294,6 +294,7 @@ Validation rules for startup:
 - `AUTH0_ISSUER_URL` must be a valid HTTPS URL ending with `/`
 - `AUTH0_AUDIENCE` must be a non-blank string
 - `JWKS_CACHE_TTL_SECONDS` must be a positive integer
+- `JWKS_REFRESH_COOLDOWN_SECONDS` must be a positive integer if provided
 - `TOKEN_LEEWAY_SECONDS` must be an integer in `[0, 60]`
 
 ---
