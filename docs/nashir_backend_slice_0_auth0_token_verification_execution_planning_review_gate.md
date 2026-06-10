@@ -31,6 +31,7 @@ This review gate independently verifies those plans against the prior gate seque
 | `docs/nashir_backend_slice_0_auth0_token_verification_execution_planning_gate.md` (PR #49) | Read in full — primary artifact under review |
 | `docs/nashir_backend_slice_0_auth0_token_verification_decision_gate.md` (PR #47) | Ten binding decisions and eleven deferred decisions the execution plan must be consistent with |
 | `docs/nashir_backend_slice_0_auth0_token_verification_planning_gate.md` (PR #45) | Risk register; `createRemoteJWKSet` coupling risk (Risk 5) |
+| `docs/nashir_backend_slice_0_auth_provider_selection_gate.md` (PR #43) | Auth0 selected as V1 external identity provider; Auth0 is identity-only and not Nashir authorization authority |
 | `docs/nashir_backend_slice_0_auth_rbac_source_of_truth_decision_gate.md` (PR #37) | Pipeline boundary; `grantedPermissions` never caller-supplied |
 | `src/request-context.ts` (`main` HEAD) | `RequestContext { workspaceId, actorId }`; both `ACTOR_ID_HEADER` and `WORKSPACE_ID_HEADER` constants present |
 | `src/app.ts` (`main` HEAD) | `resolveRequestContextFromHeaders`; no product routes; harness flags default false |
@@ -106,7 +107,7 @@ Section 8.2 explicitly notes that `jose` installation is authorized in the execu
 | `JWKS_REFRESH_COOLDOWN_SECONDS` | No | N/A — default `300` | ✓ |
 | `TOKEN_LEEWAY_SECONDS` | No | N/A — default `0` | ✓ |
 
-All six variables are named. Startup validation rules cover: `AUTH0_ISSUER_URL` (valid HTTPS URL ending `/`), `AUTH0_AUDIENCE` (non-blank string), `JWKS_CACHE_TTL_SECONDS` (positive integer), `JWKS_REFRESH_COOLDOWN_SECONDS` (positive integer if provided), `TOKEN_LEEWAY_SECONDS` (integer in `[0, 60]`). A startup error on absent required variables prevents silent misconfiguration.
+All six variables are named. Startup validation rules cover: `AUTH0_ISSUER_URL` (valid HTTPS URL ending `/`), `AUTH0_AUDIENCE` (non-blank string), `AUTH0_JWKS_URI` (valid HTTPS URL if provided), `JWKS_CACHE_TTL_SECONDS` (positive integer), `JWKS_REFRESH_COOLDOWN_SECONDS` (positive integer if provided), `TOKEN_LEEWAY_SECONDS` (integer in `[0, 60]`). A startup error on absent required variables prevents silent misconfiguration.
 
 **Result: PASS**
 
