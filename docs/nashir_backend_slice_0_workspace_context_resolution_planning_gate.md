@@ -7,16 +7,17 @@ This gate does not authorize runtime implementation.
 This gate does not authorize product routes, workspace routes, database schema changes, SQL migrations, ORM/query implementation, OpenAPI changes, deployment changes, secrets configuration, UI changes, or a new backend slice.
 2. Current Documented State
 The following state is already documented and accepted by prior gates:
-AreaDocumented State
-Auth providerAuth0 is selected for V1 identity verification
-Auth0 authority boundaryAuth0 is identity proviAuth0 authority bouhority boundaryNashir remains source of truth for Workspace, WorkspaceMember, roles, permissions, approval rules, and access decisions
-Token verificationAuth0 JWT verification via JWKS is complete
-Identity contextauthGuard emits VerifiedIdentityContext
-Verified identity payloadVerifiedIdentityContext contains actorId only
-Workspace contextworkspaceId is not resolved by authGuard
-Final request contextFullyResolvedRequestContext must be produced after workspace resolution
-Authorization pipelineauthGuard → workspaceContextGuard → permissionGuard
-Transitional headersx-nashir-actor-id and x-nashir-workspace-id are not trusted in the Auth0-enabled path
+| Area | Documented State |
+|---|---|
+| Auth provider | Auth0 is selected for V1 identity verification |
+| Auth0 authority boundary | Auth0 is identity provider. Nashir remains source of truth for Workspace, WorkspaceMember, roles, permissions, approval rules, and access decisions |
+| Token verification | Auth0 JWT verification via JWKS is complete |
+| Identity context | authGuard emits VerifiedIdentityContext |
+| Verified identity payload | VerifiedIdentityContext contains actorId only |
+| Workspace context | workspaceId is not resolved by authGuard |
+| Final request context | FullyResolvedRequestContext must be produced after workspace resolution |
+| Authorization pipeline | authGuard → workspaceContextGuard → permissionGuard |
+| Transitional headers | x-nashir-actor-id and x-nashir-workspace-id are not trusted in the Auth0-enabled path |
 3. Inputs Reviewed
 InputStatusPurpose
 PR #55MergedAuth0 token verification execution verification
@@ -86,16 +87,17 @@ The following are proposed for V1 planning and require review before implementat
 5. Global or non-workspace-scoped routes should be explicitly classified before bypassing workspaceContextGuard.
 7. Workspace Identity Source Boundary
 workspaceId must not be sourced from:
-SourceTrusted?Reason
-Auth0 token payloadNoAuth0 is not Nashir workspace authority
-Auth0 organization claimNoAuth0 organizations are not Nashir workspace authority
-Auth0 app_metadataNoMetadata is not Nashir authorization authority
-Auth0 user_metadataNoMetadata is not Nashir authorization authority
-x-nashir-workspace-idNoTransitional header not trusted in Auth0 path
-Client-supplied arbitrary body fieldNo by defaultRequires explicit route contract
-Route/path workspaceIdProposed YesRequires explicit route contract
-Persisted resource workspace ownerProposed YesRequires repository lookup
-Nashir WorkspaceMember relationYesNashir source of truth
+| Source | Trusted? | Reason |
+|---|---:|---|
+| Auth0 token payload | No | Auth0 is not Nashir workspace authority |
+| Auth0 organization claim | No | Auth0 organizations are not Nashir workspace authority |
+| Auth0 app_metadata | No | Metadata is not Nashir authorization authority |
+| Auth0 user_metadata | No | Metadata is not Nashir authorization authority |
+| x-nashir-workspace-id | No | Transitional header not trusted in Auth0 path |
+| Client-supplied arbitrary body field | No by default | Requires explicit route contract |
+| Route/path workspaceId | Proposed Yes | Requires explicit route contract |
+| Persisted resource workspace owner | Proposed Yes | Requires repository lookup |
+| Nashir WorkspaceMember relation | Yes | Nashir source of truth |
 8. Planned workspaceContextGuard Responsibility
 The planned workspaceContextGuard responsibility is:
 1. Require VerifiedIdentityContext.
@@ -160,14 +162,15 @@ workspaceContextGuard verifies membership existence.
 permissionGuard verifies action-level permission.
 12. Error Semantics Planning
 The following error behavior is proposed for review:
-FailureProposed ResultReason
-Missing VerifiedIdentityContext401Authentication context missing
-Missing required workspace source400 or 404Depends on route contract
-Invalid workspaceId format400Malformed request input
-Workspace not found404Resource does not exist
-Actor not a member of workspace404Enumeration-safe boundary
-Workspace lookup unavailable503Server dependency unavailable
-Permission missing after workspace resolutionpermissionGuard decisionNot workspaceContextGuard responsibility
+| Failure | Proposed Result | Reason |
+|---|---:|---|
+| Missing VerifiedIdentityContext | 401 | Authentication context missing |
+| Missing required workspace source | 400 or 404 | Depends on route contract |
+| Invalid workspaceId format | 400 | Malformed request input |
+| Workspace not found | 404 | Resource does not exist |
+| Actor not a member of workspace | 404 | Enumeration-safe boundary |
+| Workspace lookup unavailable | 503 | Server dependency unavailable |
+| Permission missing after workspace resolution | permissionGuard decision | Not workspaceContextGuard responsibility |
 Unresolved decision:
 DecisionStatus
 Missing workspace source returns 400 vs 404Unresolved
