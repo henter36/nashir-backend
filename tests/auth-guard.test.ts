@@ -73,7 +73,7 @@ async function signToken(
     issuer = TEST_ISSUER,
     audience = TEST_AUDIENCE,
     expiresIn = "5m",
-    signingKey = privateKey as CryptoKey
+    signingKey = privateKey
   }: {
     kid?: string;
     alg?: string;
