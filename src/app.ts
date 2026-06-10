@@ -139,10 +139,10 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     const correlationId = resolveCorrelationId(request.headers);
     request.correlationId = correlationId;
 
-    // When an Authorization header is present, JWT verification takes over
-    // regardless of harness headers. Harness headers are only consulted when
-    // no token is present, keeping them unreachable for authenticated requests.
-    if (authGuardHook && request.headers.authorization) {
+    // When Auth0 token verification is configured, all non-health requests
+    // must pass through authGuard. Transitional harness headers are only
+    // available in builds/tests that do not provide authConfig.
+    if (authGuardHook) {
       await authGuardHook(request, reply);
       return;
     }
