@@ -123,11 +123,11 @@ Required resolver contract:
 - Input:
   - `actorId`
   - `workspaceId`
-- Output:
-  - `member`
-  - `workspace_not_found`
-  - `not_member`
-  - `unavailable`
+- Output: object with an `outcome` property:
+  - `{ outcome: "member" }`
+  - `{ outcome: "workspace_not_found" }`
+  - `{ outcome: "not_member" }`
+  - `{ outcome: "unavailable" }`
 
 This gate does not authorize implementing persistence.
 
