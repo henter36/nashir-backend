@@ -189,11 +189,17 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   // correlation id, without touching auth, permissions, or any data layer.
   // Opt-in only -- disabled by default so it is never exposed by accident.
   if (enableInternalHarnessRoutes === true) {
+    const workspaceRouteHarnessOptions: {
+      preHandler?: NonNullable<typeof workspaceContextGuardHook>;
+    } = {};
+
+    if (workspaceContextGuardHook) {
+      workspaceRouteHarnessOptions.preHandler = workspaceContextGuardHook;
+    }
+
     app.get<{ Params: WorkspaceRouteHarnessParams }>(
       WORKSPACE_ROUTE_HARNESS_ROUTE,
-      workspaceContextGuardHook
-        ? { preHandler: workspaceContextGuardHook }
-        : {},
+      workspaceRouteHarnessOptions,
       workspaceRouteHarnessHandler
     );
   }
