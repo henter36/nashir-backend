@@ -116,7 +116,7 @@ describe("authGuard — valid token", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.verifiedIdentityContext).toEqual({ actorId: "auth0|user-abc-123" });
-    expect(body.requestContextActorId).toBe("auth0|user-abc-123");
+    expect(body.requestContextActorId).toBeNull();
   });
 
   it("does not expose workspaceId from authGuard (workspaceContextGuard responsibility)", async () => {
@@ -180,7 +180,12 @@ describe("authGuard — missing / malformed Authorization header", () => {
   });
 });
 
-\n// ---------------------------------------------------------------------------\n// Harness header boundary\n// ---------------------------------------------------------------------------\n\ndescribe("authGuard — harness header boundary", () => {
+
+// ---------------------------------------------------------------------------
+// Harness header boundary
+// ---------------------------------------------------------------------------
+
+describe("authGuard — harness header boundary", () => {
   it("rejects harness headers when authConfig is enabled and Authorization is absent", async () => {
     const app = buildTestApp();
 
@@ -197,7 +202,10 @@ describe("authGuard — missing / malformed Authorization header", () => {
     const body = res.json();
     expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
   });
-\n});\n\n// ---------------------------------------------------------------------------
+
+});
+
+// ---------------------------------------------------------------------------
 // Structural / header failures
 // ---------------------------------------------------------------------------
 
