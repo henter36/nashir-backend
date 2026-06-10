@@ -19,7 +19,7 @@ export const authConfigSchema = z.object({
     "must end with /"
   ),
   AUTH0_AUDIENCE: z.string().min(1, "must be a non-blank string"),
-  AUTH0_JWKS_URI: httpsUrl.optional(),
+  AUTH0_JWKS_URI: z.preprocess((val) => (val === "" ? undefined : val), httpsUrl.optional()),
   JWKS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
   JWKS_REFRESH_COOLDOWN_SECONDS: z.coerce
     .number()

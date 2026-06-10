@@ -38,7 +38,21 @@ export interface AuthGuardHookOptions {
 
 function isJwksUnavailable(err: unknown): boolean {
   if (err instanceof joseErrors.JWKSTimeout) return true;
-  if (err instanceof joseErrors.JOSEError) return false;
+
+  if (err instanceof joseErrors.JOSEError) {
+    const clientErrorCodes = new Set([
+      "ERR_JWT_EXPIRED",
+      "ERR_JWT_CLAIM_VALIDATION_FAILED",
+      "ERR_JWS_SIGNATURE_VERIFICATION_FAILED",
+      "ERR_JWKS_NO_MATCHING_KEY",
+      "ERR_JWS_INVALID",
+      "ERR_JOSE_ALG_NOT_ALLOWED",
+      "ERR_JWT_MALFORMED"
+    ]);
+
+    return !clientErrorCodes.has(err.code);
+  }
+
   return true;
 }
 
@@ -147,7 +161,6 @@ export function createAuthGuardHook(opts: AuthGuardHookOptions) {
 
       // Step 6: Bind verified identity — actorId only; workspaceId is workspaceContextGuard's responsibility
       request.verifiedIdentityContext = { actorId: payload.sub };
-      request.requestContext = { actorId: payload.sub, workspaceId: "" };
     } catch (err) {
       if (isJwksUnavailable(err)) {
         const resp = createHttpErrorResponse({
