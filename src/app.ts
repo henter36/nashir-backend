@@ -7,12 +7,13 @@ import Fastify, {
 } from "fastify";
 
 import type { AuthConfig } from "./auth-config.js";
-import {
-  createAuthGuardHook,
-  type JwksGetKey
-} from "./auth-guard.js";
+import { createAuthGuardHook, type JwksGetKey } from "./auth-guard.js";
 import { createHttpErrorResponse } from "./error-model.js";
 import { evaluatePermissionGuard } from "./permission-guard.js";
+import {
+  createWorkspaceContextGuardHook,
+  type WorkspaceMembershipResolver
+} from "./workspace-context-guard.js";
 import {
   CORRELATION_ID_HEADER,
   resolveRequestContextFromHeaders,
@@ -104,6 +105,7 @@ export interface BuildAppOptions extends FastifyServerOptions {
   enableInternalPermissionGuardHarnessRoutes?: boolean;
   authConfig?: AuthConfig;
   jwksGetKey?: JwksGetKey;
+  workspaceMembershipResolver?: WorkspaceMembershipResolver;
 }
 
 export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
@@ -112,6 +114,7 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     enableInternalPermissionGuardHarnessRoutes,
     authConfig,
     jwksGetKey,
+    workspaceMembershipResolver,
     ...fastifyOpts
   } = opts;
   const app = Fastify({ logger: true, ...fastifyOpts });
@@ -123,6 +126,13 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   const authGuardHook = authConfig
     ? createAuthGuardHook({ config: authConfig, getKey: jwksGetKey })
     : null;
+
+  const workspaceContextGuardHook =
+    authGuardHook !== null && workspaceMembershipResolver !== undefined
+      ? createWorkspaceContextGuardHook({
+          resolveMembership: workspaceMembershipResolver
+        })
+      : null;
 
   // Request-context plumbing runs at onRequest -- the earliest hook, before
   // body parsing -- so unauthorized or malformed requests are rejected
@@ -179,7 +189,15 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   // correlation id, without touching auth, permissions, or any data layer.
   // Opt-in only -- disabled by default so it is never exposed by accident.
   if (enableInternalHarnessRoutes === true) {
-    app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+    if (workspaceContextGuardHook !== null) {
+      app.get(
+        WORKSPACE_ROUTE_HARNESS_ROUTE,
+        { preHandler: workspaceContextGuardHook },
+        workspaceRouteHarnessHandler
+      );
+    } else {
+      app.get(WORKSPACE_ROUTE_HARNESS_ROUTE, workspaceRouteHarnessHandler);
+    }
   }
 
   if (enableInternalPermissionGuardHarnessRoutes === true) {
