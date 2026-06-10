@@ -343,6 +343,30 @@ describe("authGuard — claim validation", () => {
     expect(body.code).toBe("INVALID_TOKEN");
   });
 
+  it("returns 401 when iat is present but not numeric", async () => {
+    const app = buildTestApp();
+
+    const token = await new SignJWT({
+      sub: "auth0|user-123",
+      iat: "not-a-number"
+    })
+      .setProtectedHeader({ alg: "RS256", kid: TEST_KID })
+      .setIssuer(TEST_ISSUER)
+      .setAudience(TEST_AUDIENCE)
+      .setExpirationTime("5m")
+      .sign(privateKey);
+
+    const res = await app.inject({
+      method: "GET",
+      url: TEST_AUTH_ROUTE,
+      headers: { authorization: `Bearer ${token}` }
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.code).toBe("INVALID_TOKEN");
+  });
+
   it("returns 401 when iat is in the future beyond leeway", async () => {
     const app = buildTestApp({ TOKEN_LEEWAY_SECONDS: 0 });
     const futureIat = Math.floor(Date.now() / 1000) + 120;

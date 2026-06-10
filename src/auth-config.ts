@@ -20,13 +20,18 @@ export const authConfigSchema = z.object({
   ),
   AUTH0_AUDIENCE: z.string().min(1, "must be a non-blank string"),
   AUTH0_JWKS_URI: z.preprocess((val) => (val === "" ? undefined : val), httpsUrl.optional()),
-  JWKS_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
-  JWKS_REFRESH_COOLDOWN_SECONDS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(30),
-  TOKEN_LEEWAY_SECONDS: z.coerce.number().int().min(0).max(60).default(0)
+  JWKS_CACHE_TTL_SECONDS: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().int().positive().default(600)
+  ),
+  JWKS_REFRESH_COOLDOWN_SECONDS: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().int().positive().default(30)
+  ),
+  TOKEN_LEEWAY_SECONDS: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    z.coerce.number().int().min(0).max(60).default(0)
+  )
 });
 
 export type AuthConfig = z.infer<typeof authConfigSchema>;

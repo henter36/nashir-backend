@@ -1,7 +1,7 @@
 import { loadAuthConfig } from "./auth-config.js";
 import { buildApp } from "./app.js";
 
-let authConfig;
+let authConfig: ReturnType<typeof loadAuthConfig>;
 try {
   authConfig = loadAuthConfig();
 } catch (err) {

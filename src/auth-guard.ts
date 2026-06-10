@@ -144,8 +144,20 @@ export function createAuthGuardHook(opts: AuthGuardHookOptions) {
         return;
       }
 
-      // iat future-drift check using the same TOKEN_LEEWAY_SECONDS
+      // iat future-drift check using the same TOKEN_LEEWAY_SECONDS.
+      // If present, iat must be numeric.
       if (payload.iat !== undefined) {
+        if (typeof payload.iat !== "number") {
+          const resp = createHttpErrorResponse({
+            code: "INVALID_TOKEN",
+            message: "Token iat claim must be numeric.",
+            statusCode: 401,
+            correlationId
+          });
+          reply.code(401).send(resp.body);
+          return;
+        }
+
         const nowSeconds = Math.floor(Date.now() / 1000);
         if (payload.iat > nowSeconds + TOKEN_LEEWAY_SECONDS) {
           const resp = createHttpErrorResponse({
