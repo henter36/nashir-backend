@@ -180,7 +180,24 @@ describe("authGuard — missing / malformed Authorization header", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
+\n// ---------------------------------------------------------------------------\n// Harness header boundary\n// ---------------------------------------------------------------------------\n\ndescribe("authGuard — harness header boundary", () => {
+  it("rejects harness headers when authConfig is enabled and Authorization is absent", async () => {
+    const app = buildTestApp();
+
+    const res = await app.inject({
+      method: "GET",
+      url: TEST_AUTH_ROUTE,
+      headers: {
+        "x-nashir-actor-id": "actor-from-header",
+        "x-nashir-workspace-id": "workspace-from-header"
+      }
+    });
+
+    expect(res.statusCode).toBe(401);
+    const body = res.json();
+    expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
+  });
+\n});\n\n// ---------------------------------------------------------------------------
 // Structural / header failures
 // ---------------------------------------------------------------------------
 
