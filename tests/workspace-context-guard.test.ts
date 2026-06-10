@@ -12,6 +12,10 @@ import type {
   VerifiedIdentityContext
 } from "../src/request-context.js";
 
+const TEST_ACTOR_ID = "auth0|actor-1";
+const TEST_WORKSPACE_ID = "workspace-1";
+const ROUTE_WORKSPACE_ID = "workspace-route";
+
 type TestRequest = FastifyRequest & {
   verifiedIdentityContext?: VerifiedIdentityContext;
   requestContext?: FullyResolvedRequestContext;
@@ -25,6 +29,15 @@ interface TestReply {
   payload: unknown;
   code: (statusCode: number) => TestReply;
   send: (payload: unknown) => TestReply;
+}
+
+interface GuardInput {
+  params?: unknown;
+  verifiedIdentityContext?: unknown;
+  headers?: Record<string, string>;
+  body?: unknown;
+  query?: unknown;
+  resolver?: WorkspaceMembershipResolver;
 }
 
 function createReply(): TestReply {
@@ -44,13 +57,7 @@ function createReply(): TestReply {
   return reply;
 }
 
-function createRequest(input: {
-  params?: unknown;
-  verifiedIdentityContext?: unknown;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: unknown;
-}): TestRequest {
+function createRequest(input: GuardInput): TestRequest {
   return {
     params: input.params,
     verifiedIdentityContext: input.verifiedIdentityContext as
@@ -63,23 +70,12 @@ function createRequest(input: {
   } as TestRequest;
 }
 
-async function runGuard(input: {
-  params?: unknown;
-  verifiedIdentityContext?: unknown;
-  headers?: Record<string, string>;
-  body?: unknown;
-  query?: unknown;
-  resolver?: WorkspaceMembershipResolver;
-}) {
+async function runGuard(input: GuardInput) {
   const request = createRequest(input);
   const reply = createReply();
 
   const guard = createWorkspaceContextGuardHook({
-    resolveMembership:
-      input.resolver ??
-      (() => ({
-        outcome: "member"
-      }))
+    resolveMembership: input.resolver ?? (() => ({ outcome: "member" }))
   });
 
   await guard(request as FastifyRequest, reply as unknown as FastifyReply);
@@ -87,81 +83,88 @@ async function runGuard(input: {
   return { request, reply };
 }
 
+function verifiedIdentity(actorId = TEST_ACTOR_ID): VerifiedIdentityContext {
+  return { actorId };
+}
+
+function validWorkspaceParams(workspaceId = TEST_WORKSPACE_ID) {
+  return { workspaceId };
+}
+
+async function expectGuardError(
+  input: GuardInput,
+  statusCode: number,
+  code: string
+): Promise<void> {
+  const { reply } = await runGuard(input);
+
+  expect(reply.statusCode).toBe(statusCode);
+  expect(reply.payload).toMatchObject({ code });
+}
+
+async function expectResolvedContext(
+  input: GuardInput,
+  expected: FullyResolvedRequestContext
+): Promise<TestRequest> {
+  const { request, reply } = await runGuard(input);
+
+  expect(reply.statusCode).toBe(200);
+  expect(reply.payload).toBeUndefined();
+  expect(request.requestContext).toEqual(expected);
+
+  return request;
+}
+
 describe("workspaceContextGuard — identity boundary", () => {
-  it("returns 401 when VerifiedIdentityContext is missing", async () => {
-    const { reply } = await runGuard({
-      params: { workspaceId: "workspace-1" }
-    });
-
-    expect(reply.statusCode).toBe(401);
-    expect(reply.payload).toMatchObject({
-      code: "VERIFIED_IDENTITY_REQUIRED"
-    });
-  });
-
-  it("returns 401 when VerifiedIdentityContext is null", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: null,
-      params: { workspaceId: "workspace-1" }
-    });
-
-    expect(reply.statusCode).toBe(401);
-    expect(reply.payload).toMatchObject({
-      code: "VERIFIED_IDENTITY_REQUIRED"
-    });
-  });
-
-  it("returns 401 when actorId is blank", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "   " },
-      params: { workspaceId: "workspace-1" }
-    });
-
-    expect(reply.statusCode).toBe(401);
-    expect(reply.payload).toMatchObject({
-      code: "VERIFIED_IDENTITY_REQUIRED"
-    });
-  });
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["blank actorId", { actorId: "   " }]
+  ])(
+    "returns 401 when VerifiedIdentityContext is %s",
+    async (_caseName, identity) => {
+      await expectGuardError(
+        {
+          verifiedIdentityContext: identity,
+          params: validWorkspaceParams()
+        },
+        401,
+        "VERIFIED_IDENTITY_REQUIRED"
+      );
+    }
+  );
 
   it("does not require live Auth0 when VerifiedIdentityContext fixture exists", async () => {
-    const { request, reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" }
-    });
-
-    expect(reply.statusCode).toBe(200);
-    expect(reply.payload).toBeUndefined();
-    expect(request.requestContext).toEqual({
-      actorId: "auth0|actor-1",
-      workspaceId: "workspace-1"
-    });
+    await expectResolvedContext(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        params: validWorkspaceParams()
+      },
+      {
+        actorId: TEST_ACTOR_ID,
+        workspaceId: TEST_WORKSPACE_ID
+      }
+    );
   });
 });
 
 describe("workspaceContextGuard — workspaceId route parameter boundary", () => {
-  it("returns 400 when workspaceId route parameter is missing", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: {}
-    });
-
-    expect(reply.statusCode).toBe(400);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_ID_REQUIRED"
-    });
-  });
-
-  it("returns 400 when workspaceId format is invalid", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "bad workspace id" }
-    });
-
-    expect(reply.statusCode).toBe(400);
-    expect(reply.payload).toMatchObject({
-      code: "INVALID_WORKSPACE_ID"
-    });
-  });
+  it.each([
+    ["missing", {}, "WORKSPACE_ID_REQUIRED"],
+    ["invalid", { workspaceId: "bad workspace id" }, "INVALID_WORKSPACE_ID"]
+  ])(
+    "returns 400 when workspaceId route parameter is %s",
+    async (_caseName, params, code) => {
+      await expectGuardError(
+        {
+          verifiedIdentityContext: verifiedIdentity(),
+          params
+        },
+        400,
+        code
+      );
+    }
+  );
 
   it("uses the route/path workspaceId as the only trusted workspace source", async () => {
     const calls: WorkspaceMembershipResolverInput[] = [];
@@ -171,153 +174,136 @@ describe("workspaceContextGuard — workspaceId route parameter boundary", () =>
       return { outcome: "member" };
     };
 
-    const { request, reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-route" },
-      headers: { [WORKSPACE_ID_HEADER]: "workspace-header" },
-      body: { workspaceId: "workspace-body" },
-      query: { workspaceId: "workspace-query" },
-      resolver
-    });
+    await expectResolvedContext(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        params: validWorkspaceParams(ROUTE_WORKSPACE_ID),
+        headers: { [WORKSPACE_ID_HEADER]: "workspace-header" },
+        body: { workspaceId: "workspace-body" },
+        query: { workspaceId: "workspace-query" },
+        resolver
+      },
+      {
+        actorId: TEST_ACTOR_ID,
+        workspaceId: ROUTE_WORKSPACE_ID
+      }
+    );
 
-    expect(reply.statusCode).toBe(200);
     expect(calls).toEqual([
-      { actorId: "auth0|actor-1", workspaceId: "workspace-route" }
+      { actorId: TEST_ACTOR_ID, workspaceId: ROUTE_WORKSPACE_ID }
     ]);
-    expect(request.requestContext).toEqual({
-      actorId: "auth0|actor-1",
-      workspaceId: "workspace-route"
-    });
   });
 
-  it("does not fall back to x-nashir-workspace-id when route param is missing", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      headers: { [WORKSPACE_ID_HEADER]: "workspace-header" }
-    });
-
-    expect(reply.statusCode).toBe(400);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_ID_REQUIRED"
-    });
-  });
-
-  it("does not fall back to request body workspaceId", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      body: { workspaceId: "workspace-body" }
-    });
-
-    expect(reply.statusCode).toBe(400);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_ID_REQUIRED"
-    });
-  });
-
-  it("does not fall back to query string workspaceId", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      query: { workspaceId: "workspace-query" }
-    });
-
-    expect(reply.statusCode).toBe(400);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_ID_REQUIRED"
-    });
+  it.each([
+    [
+      "x-nashir-workspace-id",
+      { headers: { [WORKSPACE_ID_HEADER]: "workspace-header" } }
+    ],
+    ["request body workspaceId", { body: { workspaceId: "workspace-body" } }],
+    ["query string workspaceId", { query: { workspaceId: "workspace-query" } }]
+  ])("does not fall back to %s", async (_caseName, untrustedSource) => {
+    await expectGuardError(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        ...untrustedSource
+      },
+      400,
+      "WORKSPACE_ID_REQUIRED"
+    );
   });
 });
 
 describe("workspaceContextGuard — membership resolution", () => {
-  it("returns 404 when workspace is not found", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" },
-      resolver: () => ({ outcome: "workspace_not_found" })
-    });
-
-    expect(reply.statusCode).toBe(404);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_NOT_FOUND"
-    });
-  });
-
-  it("returns 404 when actor is not a workspace member", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" },
-      resolver: () => ({ outcome: "not_member" })
-    });
-
-    expect(reply.statusCode).toBe(404);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_NOT_FOUND"
-    });
-  });
-
-  it("returns 503 when membership resolver reports unavailable", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" },
-      resolver: () => ({ outcome: "unavailable" })
-    });
-
-    expect(reply.statusCode).toBe(503);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_MEMBERSHIP_UNAVAILABLE"
-    });
-  });
+  it.each([
+    [
+      "workspace is not found",
+      "workspace_not_found",
+      404,
+      "WORKSPACE_NOT_FOUND"
+    ],
+    [
+      "actor is not a workspace member",
+      "not_member",
+      404,
+      "WORKSPACE_NOT_FOUND"
+    ],
+    [
+      "membership resolver reports unavailable",
+      "unavailable",
+      503,
+      "WORKSPACE_MEMBERSHIP_UNAVAILABLE"
+    ]
+  ] as const)(
+    "returns %i when %s",
+    async (_caseName, outcome, statusCode, code) => {
+      await expectGuardError(
+        {
+          verifiedIdentityContext: verifiedIdentity(),
+          params: validWorkspaceParams(),
+          resolver: () => ({ outcome })
+        },
+        statusCode,
+        code
+      );
+    }
+  );
 
   it("returns 503 when membership resolver throws", async () => {
-    const { reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" },
-      resolver: () => {
-        throw new Error("resolver unavailable");
-      }
-    });
-
-    expect(reply.statusCode).toBe(503);
-    expect(reply.payload).toMatchObject({
-      code: "WORKSPACE_MEMBERSHIP_UNAVAILABLE"
-    });
+    await expectGuardError(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        params: validWorkspaceParams(),
+        resolver: () => {
+          throw new Error("resolver unavailable");
+        }
+      },
+      503,
+      "WORKSPACE_MEMBERSHIP_UNAVAILABLE"
+    );
   });
 });
 
 describe("workspaceContextGuard — resolved request context", () => {
   it("emits FullyResolvedRequestContext for valid actor and membership", async () => {
-    const { request, reply } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" }
-    });
-
-    expect(reply.statusCode).toBe(200);
-    expect(reply.payload).toBeUndefined();
-    expect(request.requestContext).toEqual({
-      actorId: "auth0|actor-1",
-      workspaceId: "workspace-1"
-    });
+    await expectResolvedContext(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        params: validWorkspaceParams()
+      },
+      {
+        actorId: TEST_ACTOR_ID,
+        workspaceId: TEST_WORKSPACE_ID
+      }
+    );
   });
 
   it("ignores workspace-like fields on verified identity context", async () => {
-    const { request } = await runGuard({
-      verifiedIdentityContext: {
-        actorId: "auth0|actor-1",
-        workspaceId: "workspace-from-token"
+    await expectResolvedContext(
+      {
+        verifiedIdentityContext: {
+          actorId: TEST_ACTOR_ID,
+          workspaceId: "workspace-from-token"
+        },
+        params: validWorkspaceParams(ROUTE_WORKSPACE_ID)
       },
-      params: { workspaceId: "workspace-route" }
-    });
-
-    expect(request.requestContext).toEqual({
-      actorId: "auth0|actor-1",
-      workspaceId: "workspace-route"
-    });
+      {
+        actorId: TEST_ACTOR_ID,
+        workspaceId: ROUTE_WORKSPACE_ID
+      }
+    );
   });
 
   it("does not attach permissions or roles to requestContext", async () => {
-    const { request } = await runGuard({
-      verifiedIdentityContext: { actorId: "auth0|actor-1" },
-      params: { workspaceId: "workspace-1" }
-    });
+    const request = await expectResolvedContext(
+      {
+        verifiedIdentityContext: verifiedIdentity(),
+        params: validWorkspaceParams()
+      },
+      {
+        actorId: TEST_ACTOR_ID,
+        workspaceId: TEST_WORKSPACE_ID
+      }
+    );
 
     expect(request.requestContext).not.toHaveProperty("permissions");
     expect(request.requestContext).not.toHaveProperty("roles");
