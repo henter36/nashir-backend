@@ -105,7 +105,7 @@ This is a named prohibition with binding source citations. No Auth0 SDK package 
 | `AUTH0_AUDIENCE` | ✓ | Yes | Non-blank string; startup error if absent |
 | `AUTH0_JWKS_URI` | ✓ | No | Valid HTTPS URL if provided; default: derived from `AUTH0_ISSUER_URL` |
 | `JWKS_CACHE_TTL_SECONDS` | ✓ | No | Positive integer; default: `600` |
-| `JWKS_REFRESH_COOLDOWN_SECONDS` | ✓ | No | Positive integer if provided; default: `300` |
+| `JWKS_REFRESH_COOLDOWN_SECONDS` | ✓ | No | Positive integer if provided; default: `30` |
 | `TOKEN_LEEWAY_SECONDS` | ✓ | No | Integer in `[0, 60]`; default: `0` |
 
 All six are present. Section 3.2 states: "Throws a startup error with a descriptive message if a required variable is absent or any variable fails its constraint."
