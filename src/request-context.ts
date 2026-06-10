@@ -7,6 +7,14 @@ export interface RequestContext {
   actorId: string;
 }
 
+export interface VerifiedIdentityContext {
+  actorId: string;
+}
+
+export interface FullyResolvedRequestContext extends VerifiedIdentityContext {
+  workspaceId: string;
+}
+
 export interface RequestContextIssue {
   header: string;
   reason: "missing" | "blank";

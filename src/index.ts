@@ -1,6 +1,15 @@
+import { loadAuthConfig } from "./auth-config.js";
 import { buildApp } from "./app.js";
 
-const app = buildApp();
+let authConfig: ReturnType<typeof loadAuthConfig>;
+try {
+  authConfig = loadAuthConfig();
+} catch (err) {
+  console.error(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+}
+
+const app = buildApp({ authConfig });
 const host = process.env.HOST ?? "127.0.0.1";
 const rawPort = process.env.PORT ?? "3000";
 const port = parseInt(rawPort, 10);
