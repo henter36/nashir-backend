@@ -181,6 +181,7 @@ Status: Controlled.
 | Resolver contract clarified | PASS |
 | Permission boundary preserved | PASS |
 | OpenAPI risk identified | PASS |
+| Transitional header path isolated | PASS |
 | Formatting baseline deferred | PASS |
 | Implementation still unauthorized | PASS |
 
