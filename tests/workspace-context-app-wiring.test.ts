@@ -100,6 +100,15 @@ function outcomeResolver(
   return () => ({ outcome });
 }
 
+function buildEnabledWorkspaceApp(
+  resolver: WorkspaceMembershipResolver = memberResolver()
+): FastifyInstance {
+  return buildWorkspaceApp({
+    enableInternalHarnessRoutes: true,
+    resolver
+  });
+}
+
 async function injectWorkspaceHarness(
   app: FastifyInstance,
   input: {
@@ -124,10 +133,7 @@ async function injectWorkspaceHarness(
 
 describe("workspace context app wiring — route-scoped harness", () => {
   it("keeps /health ungated when auth and workspace resolver are configured", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: memberResolver()
-    });
+    const app = buildEnabledWorkspaceApp();
 
     const response = await app.inject({
       method: "GET",
@@ -216,10 +222,7 @@ describe("workspace context app wiring — route-scoped harness", () => {
   );
 
   it("returns 503 when membership resolver reports unavailable", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: outcomeResolver("unavailable")
-    });
+    const app = buildEnabledWorkspaceApp(outcomeResolver("unavailable"));
 
     const { statusCode, body } = await injectWorkspaceHarness(app);
 
@@ -228,11 +231,8 @@ describe("workspace context app wiring — route-scoped harness", () => {
   });
 
   it("returns 503 when membership resolver throws", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: () => {
-        throw new Error("membership lookup unavailable");
-      }
+    const app = buildEnabledWorkspaceApp(() => {
+      throw new Error("membership lookup unavailable");
     });
 
     const { statusCode, body } = await injectWorkspaceHarness(app);
@@ -243,10 +243,7 @@ describe("workspace context app wiring — route-scoped harness", () => {
   });
 
   it("requires authGuard-produced verified identity before workspace resolution", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: memberResolver()
-    });
+    const app = buildEnabledWorkspaceApp();
 
     const response = await app.inject({
       method: "GET",
@@ -263,10 +260,7 @@ describe("workspace context app wiring — route-scoped harness", () => {
   });
 
   it("does not replace an invalid route workspaceId with header or query values", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: memberResolver()
-    });
+    const app = buildEnabledWorkspaceApp();
 
     const { statusCode, body } = await injectWorkspaceHarness(app, {
       url: "/internal/workspace-route-harness/%20%20%20",
@@ -280,17 +274,15 @@ describe("workspace context app wiring — route-scoped harness", () => {
   });
 
   it("does not attach permissions or roles to the emitted request context", async () => {
-    const app = buildWorkspaceApp({
-      enableInternalHarnessRoutes: true,
-      resolver: memberResolver()
-    });
+    const app = buildEnabledWorkspaceApp();
 
     const { body } = await injectWorkspaceHarness(app);
 
-    expect(Object.keys(body.requestContext).sort()).toEqual([
-      "actorId",
-      "workspaceId"
-    ]);
+    expect(
+      Object.keys(body.requestContext).sort((left, right) =>
+        left.localeCompare(right)
+      )
+    ).toEqual(["actorId", "workspaceId"]);
     expect(body.requestContext).not.toHaveProperty("permissions");
     expect(body.requestContext).not.toHaveProperty("roles");
     expect(body.requestContext).not.toHaveProperty("grantedPermissions");
