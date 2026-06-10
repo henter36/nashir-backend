@@ -58,7 +58,7 @@ function buildTestApp(configOverrides?: Partial<AuthConfig>) {
   app.get(TEST_AUTH_ROUTE, async (request) => ({
     ok: true,
     verifiedIdentityContext: request.verifiedIdentityContext ?? null,
-    requestContextActorId: request.requestContext?.actorId ?? null
+    requestContextActorId: request.requestContext?.actorId ?? null ?? null
   }));
 
   apps.push(app);
