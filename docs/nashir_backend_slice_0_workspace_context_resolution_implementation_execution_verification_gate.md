@@ -183,7 +183,7 @@ Not classified as:
 
 `Workspace Context Resolution implementation defect`
 
-Decision: DEFER to a separate formatting baseline cleanup gate if needed.
+Decision: DEFER to a separate Repository Formatting Baseline Cleanup Planning Gate if needed.
 
 Result: PASS with deferred cleanup.
 
@@ -227,7 +227,7 @@ Repository-wide formatting warnings exist outside this slice.
 
 They should not be mixed with this execution verification.
 
-Status: Deferred to a separate repository formatting cleanup gate.
+Status: Deferred to a separate Repository Formatting Baseline Cleanup Planning Gate.
 
 ## 15. Verification Summary
 
