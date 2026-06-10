@@ -127,12 +127,12 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     ? createAuthGuardHook({ config: authConfig, getKey: jwksGetKey })
     : null;
 
-  const workspaceContextGuardHook =
-    authGuardHook !== null && workspaceMembershipResolver !== undefined
-      ? createWorkspaceContextGuardHook({
-          resolveMembership: workspaceMembershipResolver
-        })
-      : null;
+  let workspaceContextGuardHook = null;
+  if (authGuardHook && workspaceMembershipResolver) {
+    workspaceContextGuardHook = createWorkspaceContextGuardHook({
+      resolveMembership: workspaceMembershipResolver
+    });
+  }
 
   // Request-context plumbing runs at onRequest -- the earliest hook, before
   // body parsing -- so unauthorized or malformed requests are rejected
@@ -191,7 +191,7 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   if (enableInternalHarnessRoutes === true) {
     app.get<{ Params: WorkspaceRouteHarnessParams }>(
       WORKSPACE_ROUTE_HARNESS_ROUTE,
-      workspaceContextGuardHook !== null
+      workspaceContextGuardHook
         ? { preHandler: workspaceContextGuardHook }
         : {},
       workspaceRouteHarnessHandler

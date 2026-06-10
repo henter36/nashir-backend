@@ -73,12 +73,8 @@ function buildWorkspaceApp(
     logger: false,
     authConfig: input.authConfig ?? TEST_AUTH_CONFIG,
     jwksGetKey: getKey,
-    ...(input.enableInternalHarnessRoutes !== undefined
-      ? { enableInternalHarnessRoutes: input.enableInternalHarnessRoutes }
-      : {}),
-    ...(input.resolver !== undefined
-      ? { workspaceMembershipResolver: input.resolver }
-      : {})
+    enableInternalHarnessRoutes: input.enableInternalHarnessRoutes,
+    workspaceMembershipResolver: input.resolver
   });
 
   apps.push(app);
@@ -209,10 +205,7 @@ describe("workspace context app wiring — route-scoped harness", () => {
   ] as const)(
     "returns 404 when resolver outcome is %s",
     async (outcome, expectedCode) => {
-      const app = buildWorkspaceApp({
-        enableInternalHarnessRoutes: true,
-        resolver: outcomeResolver(outcome)
-      });
+      const app = buildEnabledWorkspaceApp(outcomeResolver(outcome));
 
       const { statusCode, body } = await injectWorkspaceHarness(app);
 
