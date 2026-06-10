@@ -346,15 +346,30 @@ describe("authGuard — claim validation", () => {
   it("returns 401 when iat is present but not numeric", async () => {
     const app = buildTestApp();
 
-    const token = await new SignJWT({
+    const payload = {
       sub: "auth0|user-123",
+      iss: TEST_ISSUER,
+      aud: TEST_AUDIENCE,
+      exp: Math.floor(Date.now() / 1000) + 300,
       iat: "not-a-number"
-    })
-      .setProtectedHeader({ alg: "RS256", kid: TEST_KID })
-      .setIssuer(TEST_ISSUER)
-      .setAudience(TEST_AUDIENCE)
-      .setExpirationTime("5m")
-      .sign(privateKey);
+    };
+
+    const protectedHeader = Buffer.from(
+      JSON.stringify({ alg: "RS256", kid: TEST_KID })
+    ).toString("base64url");
+
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
+      "base64url"
+    );
+
+    const signingInput = `${protectedHeader}.${encodedPayload}`;
+    const signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      privateKey,
+      Buffer.from(signingInput)
+    );
+
+    const token = `${signingInput}.${Buffer.from(signature).toString("base64url")}`;
 
     const res = await app.inject({
       method: "GET",
