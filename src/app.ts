@@ -6,17 +6,24 @@ import Fastify, {
   type FastifyServerOptions
 } from "fastify";
 
+import type { AuthConfig } from "./auth-config.js";
+import {
+  createAuthGuardHook,
+  type JwksGetKey
+} from "./auth-guard.js";
 import { createHttpErrorResponse } from "./error-model.js";
 import { evaluatePermissionGuard } from "./permission-guard.js";
 import {
   CORRELATION_ID_HEADER,
   resolveRequestContextFromHeaders,
-  type RequestContext
+  type RequestContext,
+  type VerifiedIdentityContext
 } from "./request-context.js";
 
 declare module "fastify" {
   interface FastifyRequest {
     requestContext?: RequestContext;
+    verifiedIdentityContext?: VerifiedIdentityContext;
     correlationId?: string;
   }
 }
@@ -95,18 +102,27 @@ export interface BuildAppOptions extends FastifyServerOptions {
   // normal runtime use; callers must explicitly enable them.
   enableInternalHarnessRoutes?: boolean;
   enableInternalPermissionGuardHarnessRoutes?: boolean;
+  authConfig?: AuthConfig;
+  jwksGetKey?: JwksGetKey;
 }
 
 export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   const {
     enableInternalHarnessRoutes,
     enableInternalPermissionGuardHarnessRoutes,
+    authConfig,
+    jwksGetKey,
     ...fastifyOpts
   } = opts;
   const app = Fastify({ logger: true, ...fastifyOpts });
 
   app.decorateRequest("requestContext", undefined);
+  app.decorateRequest("verifiedIdentityContext", undefined);
   app.decorateRequest("correlationId", undefined);
+
+  const authGuardHook = authConfig
+    ? createAuthGuardHook({ config: authConfig, getKey: jwksGetKey })
+    : null;
 
   // Request-context plumbing runs at onRequest -- the earliest hook, before
   // body parsing -- so unauthorized or malformed requests are rejected
@@ -122,6 +138,14 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
 
     const correlationId = resolveCorrelationId(request.headers);
     request.correlationId = correlationId;
+
+    // When an Authorization header is present, JWT verification takes over
+    // regardless of harness headers. Harness headers are only consulted when
+    // no token is present, keeping them unreachable for authenticated requests.
+    if (authGuardHook && request.headers.authorization) {
+      await authGuardHook(request, reply);
+      return;
+    }
 
     const result = resolveRequestContextFromHeaders(request.headers);
     if (!result.ok) {
