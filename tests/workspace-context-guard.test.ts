@@ -99,6 +99,18 @@ describe("workspaceContextGuard — identity boundary", () => {
     });
   });
 
+  it("returns 401 when VerifiedIdentityContext is null", async () => {
+    const { reply } = await runGuard({
+      verifiedIdentityContext: null,
+      params: { workspaceId: "workspace-1" }
+    });
+
+    expect(reply.statusCode).toBe(401);
+    expect(reply.payload).toMatchObject({
+      code: "VERIFIED_IDENTITY_REQUIRED"
+    });
+  });
+
   it("returns 401 when actorId is blank", async () => {
     const { reply } = await runGuard({
       verifiedIdentityContext: { actorId: "   " },

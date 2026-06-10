@@ -19,7 +19,9 @@ export type WorkspaceMembershipResolverResult =
 
 export type WorkspaceMembershipResolver = (
   input: WorkspaceMembershipResolverInput
-) => Promise<WorkspaceMembershipResolverResult> | WorkspaceMembershipResolverResult;
+) =>
+  | Promise<WorkspaceMembershipResolverResult>
+  | WorkspaceMembershipResolverResult;
 
 export interface WorkspaceContextGuardHookOptions {
   resolveMembership: WorkspaceMembershipResolver;
@@ -52,10 +54,7 @@ function sendError(
   reply.code(statusCode).send(response.body);
 }
 
-function readRouteParam(
-  request: FastifyRequest,
-  paramName: string
-): unknown {
+function readRouteParam(request: FastifyRequest, paramName: string): unknown {
   const params = request.params;
 
   if (
@@ -101,13 +100,12 @@ function resolveWorkspaceIdFromRouteParams(
 
 function resolveVerifiedIdentity(
   request: WorkspaceContextGuardRequest
-):
-  | { ok: true; identity: VerifiedIdentityContext }
-  | { ok: false } {
+): { ok: true; identity: VerifiedIdentityContext } | { ok: false } {
   const identity = request.verifiedIdentityContext;
 
   if (
     identity === undefined ||
+    identity === null ||
     typeof identity.actorId !== "string" ||
     identity.actorId.trim().length === 0
   ) {
@@ -119,7 +117,7 @@ function resolveVerifiedIdentity(
 
 export function createWorkspaceContextGuardHook(
   opts: WorkspaceContextGuardHookOptions
-) {
+): (request: FastifyRequest, reply: FastifyReply) => Promise<void> {
   const workspaceIdParamName =
     opts.workspaceIdParamName ?? DEFAULT_WORKSPACE_ID_PARAM;
 
