@@ -91,7 +91,7 @@ A startup-time configuration validator that:
 A Fastify `onRequest` hook or preHandler plugin that executes the following sequence, in order, with no deviations:
 
 1. **Token extraction** — extract raw token from `Authorization: Bearer <token>`; reject 401 if absent, wrong scheme, or blank
-2. **`kid` extraction** — parse first base64url segment only; extract `kid` from JWS header; reject 401 if token is malformed or `kid` is absent; do not read any payload field
+2. **`kid` extraction** — use `jose.decodeProtectedHeader(token)` to decode only the JWS protected header and extract `kid`; reject 401 if the token/header is malformed or `kid` is absent; do not read any payload field
 3. **JWKS key retrieval** — fetch key matching `kid` from the configured JWKS endpoint (cache-first, rate-limited refresh per Section 3.5); reject 401 if `kid` unknown after refresh; reject 503/502 if endpoint unavailable
 4. **Signature verification** — call `jose` `jwtVerify` with explicit algorithm allowlist (RS256 and/or ES256); reject 401 on invalid signature; algorithm `none` must not appear in the allowlist
 5. **Claim validation** (post-signature only) — validate `iss` (exact match), `aud`, `exp` (with `TOKEN_LEEWAY_SECONDS` leeway), `iat` (future-drift check using `TOKEN_LEEWAY_SECONDS`; skip if absent), `sub` (non-blank); reject 401 on any failure
@@ -109,8 +109,9 @@ The `authGuard` must not:
 A JWKS cache layer that satisfies:
 
 - Cache TTL bounded by `JWKS_CACHE_TTL_SECONDS` — because `jose`'s `createRemoteJWKSet` does not expose a configurable TTL, the implementation must use a wrapper, periodic re-initialization, or an equivalent mechanism that enforces the TTL boundary
-- `kid` cache miss triggers one JWKS re-fetch, subject to `JWKS_REFRESH_COOLDOWN_SECONDS` rate limit per `kid`
-- Rate-limit enforcement prevents unbounded re-fetches from tokens with manufactured `kid` values
+- `kid` cache miss may trigger one JWKS re-fetch, subject to a global `JWKS_REFRESH_COOLDOWN_SECONDS` rate limit across all unknown `kid` values
+- Rate-limit enforcement must be global, not per `kid`, to prevent unbounded re-fetches from tokens with manufactured or random `kid` values
+- Default `JWKS_REFRESH_COOLDOWN_SECONDS` for implementation authorization is 30 seconds unless a later gate explicitly changes it
 - JWKS URI sourced from config, never hardcoded
 
 ### 3.6 Error response mapping
