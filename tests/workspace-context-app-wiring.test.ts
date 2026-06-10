@@ -71,10 +71,14 @@ function buildWorkspaceApp(
 ): FastifyInstance {
   const app = buildApp({
     logger: false,
-    enableInternalHarnessRoutes: input.enableInternalHarnessRoutes,
     authConfig: input.authConfig ?? TEST_AUTH_CONFIG,
     jwksGetKey: getKey,
-    workspaceMembershipResolver: input.resolver
+    ...(input.enableInternalHarnessRoutes !== undefined
+      ? { enableInternalHarnessRoutes: input.enableInternalHarnessRoutes }
+      : {}),
+    ...(input.resolver !== undefined
+      ? { workspaceMembershipResolver: input.resolver }
+      : {})
   });
 
   apps.push(app);
