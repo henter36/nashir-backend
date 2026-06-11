@@ -15,7 +15,10 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "validate:contract-authority": "node scripts/validate-contract-authority.mjs",
-    "validate:contracts": "node scripts/validate-contracts.mjs"
+    "validate:contracts": "node scripts/validate-contracts.mjs",
+    "db:migrate": "node scripts/migrate.mjs up",
+    "db:migrate:status": "node scripts/migrate.mjs status",
+    "test:db": "vitest run tests/migrations.test.ts"
   },
   "dependencies": {
     "fastify": "^5.4.0",
