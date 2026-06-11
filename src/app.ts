@@ -139,7 +139,7 @@ async function workspacePermissionGuardHarnessHandler(
 
   return {
     ok: true,
-    workspaceId: request.params.workspaceId,
+    workspaceId: requestContext.workspaceId,
     requiredPermission: decision.requiredPermission,
     decision: decision.decision,
     requestContext: decision.requestContext,

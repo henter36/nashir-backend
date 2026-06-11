@@ -12,52 +12,82 @@ import type {
   WorkspaceMembershipResolverResult
 } from "../src/workspace-context-guard.js";
 
-const kid = "permission-app-wiring-key";
-const issuer = "https://permission-auth.example.com/";
-const audience = "https://permission-api.example.com";
-const actorId = "auth0|permission-actor";
-const routeWorkspaceId = "workspace-route";
-const allowedPermission = "harness.read";
-const missingPermission = "harness.admin";
+const identity = {
+  kid: "permission-app-wiring-key",
+  issuer: "https://permission-auth.example.com/",
+  audience: "https://permission-api.example.com",
+  actorId: "auth0|permission-actor"
+} as const;
 
-let privateKey: CryptoKey;
-let getKey: JwksGetKey;
+const workspace = {
+  route: "workspace-route",
+  header: "workspace-header",
+  other: "workspace-other"
+} as const;
 
-const apps: FastifyInstance[] = [];
+const permission = {
+  allowed: "harness.read",
+  missing: "harness.admin"
+} as const;
 
 const authConfig: AuthConfig = {
-  AUTH0_ISSUER_URL: issuer,
-  AUTH0_AUDIENCE: audience,
+  AUTH0_ISSUER_URL: identity.issuer,
+  AUTH0_AUDIENCE: identity.audience,
   JWKS_CACHE_TTL_SECONDS: 600,
   JWKS_REFRESH_COOLDOWN_SECONDS: 30,
   TOKEN_LEEWAY_SECONDS: 0
 };
 
+let signingKey: CryptoKey;
+let resolveJwksKey: JwksGetKey;
+
+const openApps = new Set<FastifyInstance>();
+
+interface HarnessRequestOptions {
+  requiredPermission?: string;
+  workspaceId?: string;
+  query?: string;
+  claims?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  payload?: unknown;
+}
+
 beforeAll(async () => {
-  const keys = await generateKeyPair("RS256", { modulusLength: 2048 });
-  privateKey = keys.privateKey;
+  const keyPair = await generateKeyPair("RS256", { modulusLength: 2048 });
+  signingKey = keyPair.privateKey;
 
-  const jwk = await exportJWK(keys.publicKey);
-  Object.assign(jwk, { kid, alg: "RS256", use: "sig" });
+  const publicJwk = await exportJWK(keyPair.publicKey);
+  publicJwk.kid = identity.kid;
+  publicJwk.alg = "RS256";
+  publicJwk.use = "sig";
 
-  getKey = createLocalJWKSet({ keys: [jwk] });
+  resolveJwksKey = createLocalJWKSet({ keys: [publicJwk] });
 });
 
 afterEach(async () => {
-  await Promise.all(apps.splice(0).map((app) => app.close()));
+  await Promise.all([...openApps].map((app) => app.close()));
+  openApps.clear();
 });
 
-async function token(claims: Record<string, unknown> = {}): Promise<string> {
-  return new SignJWT({ ...claims, sub: actorId })
-    .setProtectedHeader({ alg: "RS256", kid })
-    .setIssuedAt()
-    .setIssuer(issuer)
-    .setAudience(audience)
-    .setExpirationTime("5m")
-    .sign(privateKey);
+function remember(app: FastifyInstance): FastifyInstance {
+  openApps.add(app);
+  return app;
 }
 
-function member(
+function appWith(options: BuildAppOptions): FastifyInstance {
+  return remember(
+    buildApp({ logger: false, jwksGetKey: resolveJwksKey, ...options })
+  );
+}
+
+function workspacePermissionPath(
+  requiredPermission = permission.allowed,
+  workspaceId = workspace.route
+): string {
+  return `/internal/workspace-permission-guard-harness/${workspaceId}/${requiredPermission}`;
+}
+
+function membership(
   calls: WorkspaceMembershipResolverInput[] = []
 ): WorkspaceMembershipResolver {
   return (input) => {
@@ -66,19 +96,15 @@ function member(
   };
 }
 
-function outcome(
-  value: WorkspaceMembershipResolverResult["outcome"]
+function membershipOutcome(
+  outcome: WorkspaceMembershipResolverResult["outcome"]
 ): WorkspaceMembershipResolver {
-  return () => ({ outcome: value });
+  return () => ({ outcome });
 }
 
-function appWith(options: BuildAppOptions): FastifyInstance {
-  const app = buildApp({ logger: false, jwksGetKey: getKey, ...options });
-  apps.push(app);
-  return app;
-}
-
-function guarded(resolver: WorkspaceMembershipResolver = member()) {
+function protectedApp(
+  resolver: WorkspaceMembershipResolver = membership()
+): FastifyInstance {
   return appWith({
     authConfig,
     enableInternalPermissionGuardHarnessRoutes: true,
@@ -86,36 +112,36 @@ function guarded(resolver: WorkspaceMembershipResolver = member()) {
   });
 }
 
-function harnessPath(
-  requiredPermission = allowedPermission,
-  workspaceId = routeWorkspaceId
+async function bearerToken(
+  claims: Record<string, unknown> = {}
+): Promise<string> {
+  const jwt = new SignJWT({ ...claims, sub: identity.actorId });
+
+  return jwt
+    .setProtectedHeader({ alg: "RS256", kid: identity.kid })
+    .setIssuedAt()
+    .setIssuer(identity.issuer)
+    .setAudience(identity.audience)
+    .setExpirationTime("5m")
+    .sign(signingKey);
+}
+
+async function injectHarness(
+  app: FastifyInstance,
+  options: HarnessRequestOptions = {}
 ) {
-  return `/internal/workspace-permission-guard-harness/${workspaceId}/${requiredPermission}`;
-}
-
-interface InjectOptions {
-  requiredPermission?: string;
-  workspaceId?: string;
-  query?: string;
-  headerWorkspaceId?: string;
-  claims?: Record<string, unknown>;
-  payload?: unknown;
-  headers?: Record<string, string>;
-}
-
-async function get(app: FastifyInstance, options: InjectOptions = {}) {
-  const bearer = await token(options.claims);
+  const token = await bearerToken(options.claims);
   const query = options.query ? `?${options.query}` : "";
 
   const response = await app.inject({
     method: "GET",
-    url: `${harnessPath(
+    url: `${workspacePermissionPath(
       options.requiredPermission,
       options.workspaceId
     )}${query}`,
     headers: {
-      authorization: `Bearer ${bearer}`,
-      [WORKSPACE_ID_HEADER]: options.headerWorkspaceId ?? "workspace-header",
+      authorization: `Bearer ${token}`,
+      [WORKSPACE_ID_HEADER]: workspace.header,
       ...options.headers
     },
     payload:
@@ -128,19 +154,22 @@ async function get(app: FastifyInstance, options: InjectOptions = {}) {
 }
 
 describe("permission guard app wiring", () => {
-  it("keeps health ungated and workspace permission harness disabled by default", async () => {
-    const app = appWith({ authConfig, workspaceMembershipResolver: member() });
+  it("keeps health ungated and the workspace permission harness disabled by default", async () => {
+    const app = appWith({
+      authConfig,
+      workspaceMembershipResolver: membership()
+    });
 
     const health = await app.inject({ method: "GET", url: "/health" });
     expect(health.statusCode).toBe(200);
 
-    const bearer = await token();
+    const token = await bearerToken();
     const disabled = await app.inject({
       method: "GET",
-      url: harnessPath(),
+      url: workspacePermissionPath(),
       headers: {
-        authorization: `Bearer ${bearer}`,
-        [WORKSPACE_ID_HEADER]: "workspace-header"
+        authorization: `Bearer ${token}`,
+        [WORKSPACE_ID_HEADER]: workspace.header
       }
     });
 
@@ -148,128 +177,134 @@ describe("permission guard app wiring", () => {
     expect(disabled.json().code).toBe("NOT_FOUND");
   });
 
-  it("requires successful Auth0 identity verification when authConfig exists", async () => {
-    const response = await guarded().inject({
+  it("requires Auth0 identity verification before the workspace permission harness runs", async () => {
+    const response = await protectedApp().inject({
       method: "GET",
-      url: harnessPath(),
-      headers: { [WORKSPACE_ID_HEADER]: "workspace-header" }
+      url: workspacePermissionPath(),
+      headers: { [WORKSPACE_ID_HEADER]: workspace.header }
     });
 
     expect(response.statusCode).toBe(401);
     expect(response.json().code).toBe("MISSING_AUTHORIZATION_TOKEN");
   });
 
-  it("requires successful workspace context resolution before permission enforcement", async () => {
-    const { response, body } = await get(guarded(outcome("not_member")));
+  it("requires workspace context resolution before permission enforcement", async () => {
+    const { response, body } = await injectHarness(
+      protectedApp(membershipOutcome("not_member"))
+    );
 
     expect(response.statusCode).toBe(404);
     expect(body.code).toBe("WORKSPACE_NOT_FOUND");
     expect(JSON.stringify(body)).not.toContain("FORBIDDEN");
   });
 
-  it("allows after workspace membership succeeds and permission is granted", async () => {
+  it("allows a request only after membership and permission both succeed", async () => {
     const calls: WorkspaceMembershipResolverInput[] = [];
-    const { response, body } = await get(guarded(member(calls)));
+    const { response, body } = await injectHarness(
+      protectedApp(membership(calls))
+    );
 
     expect(response.statusCode).toBe(200);
-    expect(calls).toEqual([{ actorId, workspaceId: routeWorkspaceId }]);
+    expect(calls).toEqual([
+      { actorId: identity.actorId, workspaceId: workspace.route }
+    ]);
     expect(body).toMatchObject({
       ok: true,
-      workspaceId: routeWorkspaceId,
-      requiredPermission: allowedPermission,
+      workspaceId: workspace.route,
+      requiredPermission: permission.allowed,
       decision: "allowed",
       requestContext: {
-        actorId,
-        workspaceId: routeWorkspaceId
+        actorId: identity.actorId,
+        workspaceId: workspace.route
       }
     });
     expect(body).not.toHaveProperty("grantedPermissions");
   });
 
-  it("returns 403 for missing permission in disclosing mode", async () => {
-    const { response, body } = await get(guarded(), {
-      requiredPermission: missingPermission
-    });
+  it.each([
+    ["disclosing", undefined, 403, "FORBIDDEN"],
+    ["non-disclosing", "disclosureMode=non_disclosing", 404, "NOT_FOUND"]
+  ] as const)(
+    "maps missing permission through %s disclosure behavior",
+    async (_label, query, statusCode, code) => {
+      const { response, body } = await injectHarness(protectedApp(), {
+        requiredPermission: permission.missing,
+        query
+      });
 
-    expect(response.statusCode).toBe(403);
-    expect(body.code).toBe("FORBIDDEN");
-    expect(body.requiredPermission).toBe(missingPermission);
-    expect(JSON.stringify(body)).not.toContain(actorId);
-    expect(body).not.toHaveProperty("grantedPermissions");
-  });
+      expect(response.statusCode).toBe(statusCode);
+      expect(body.code).toBe(code);
+      expect(body.requiredPermission).toBe(permission.missing);
+      expect(JSON.stringify(body)).not.toContain(identity.actorId);
+      expect(body).not.toHaveProperty("grantedPermissions");
+    }
+  );
 
-  it("returns 404 for missing permission in non-disclosing mode", async () => {
-    const { response, body } = await get(guarded(), {
-      requiredPermission: missingPermission,
-      query: "disclosureMode=non_disclosing"
-    });
-
-    expect(response.statusCode).toBe(404);
-    expect(body.code).toBe("NOT_FOUND");
-    expect(body.requiredPermission).toBe(missingPermission);
-    expect(JSON.stringify(body)).not.toContain(actorId);
-    expect(body).not.toHaveProperty("grantedPermissions");
-  });
-
-  it("returns 404 for cross-workspace resource mismatch even when permission is granted", async () => {
-    const { response, body } = await get(guarded(), {
-      requiredPermission: allowedPermission,
-      query: "resourceWorkspaceId=workspace-other"
+  it("returns 404 for cross-workspace resource mismatch even with a granted permission", async () => {
+    const { response, body } = await injectHarness(protectedApp(), {
+      query: `resourceWorkspaceId=${workspace.other}`
     });
 
     expect(response.statusCode).toBe(404);
     expect(body.code).toBe("NOT_FOUND");
-    expect(body.requiredPermission).toBe(allowedPermission);
+    expect(body.requiredPermission).toBe(permission.allowed);
   });
 
-  it("uses route workspaceId rather than header workspaceId for permission context", async () => {
+  it("uses the route workspaceId rather than the transitional header workspaceId", async () => {
     const calls: WorkspaceMembershipResolverInput[] = [];
-    const { response, body } = await get(guarded(member(calls)), {
-      headerWorkspaceId: "workspace-from-header"
-    });
+    const { response, body } = await injectHarness(
+      protectedApp(membership(calls))
+    );
 
     expect(response.statusCode).toBe(200);
-    expect(calls).toEqual([{ actorId, workspaceId: routeWorkspaceId }]);
-    expect(body.requestContext.workspaceId).toBe(routeWorkspaceId);
+    expect(calls).toEqual([
+      { actorId: identity.actorId, workspaceId: workspace.route }
+    ]);
+    expect(body.requestContext.workspaceId).toBe(workspace.route);
   });
 
-  it("does not read granted permissions from headers, body, or query string", async () => {
-    const { response, body } = await get(guarded(), {
-      requiredPermission: missingPermission,
-      query: "grantedPermissions=harness.admin&permissions=harness.admin",
-      headers: {
-        "content-type": "application/json",
-        "x-nashir-permissions": "harness.admin",
-        "x-nashir-granted-permissions": "harness.admin"
-      },
-      payload: {
-        permissions: ["harness.admin"],
-        grantedPermissions: ["harness.admin"]
+  it.each([
+    [
+      "client input",
+      {
+        query: "grantedPermissions=harness.admin&permissions=harness.admin",
+        headers: {
+          "content-type": "application/json",
+          "x-nashir-permissions": "harness.admin",
+          "x-nashir-granted-permissions": "harness.admin"
+        },
+        payload: {
+          permissions: ["harness.admin"],
+          grantedPermissions: ["harness.admin"]
+        }
       }
-    });
-
-    expect(response.statusCode).toBe(403);
-    expect(body.code).toBe("FORBIDDEN");
-    expect(body.requiredPermission).toBe(missingPermission);
-  });
-
-  it("does not read granted permissions from Auth0 claims", async () => {
-    const { response, body } = await get(guarded(), {
-      requiredPermission: missingPermission,
-      claims: {
-        permissions: ["harness.admin"],
-        scope: "harness.admin",
-        "https://nashir.example.com/permissions": ["harness.admin"]
+    ],
+    [
+      "Auth0 claims",
+      {
+        claims: {
+          permissions: ["harness.admin"],
+          scope: "harness.admin",
+          "https://nashir.example.com/permissions": ["harness.admin"]
+        }
       }
-    });
+    ]
+  ] as Array<[string, HarnessRequestOptions]>)(
+    "does not read granted permissions from %s",
+    async (_source, options) => {
+      const { response, body } = await injectHarness(protectedApp(), {
+        ...options,
+        requiredPermission: permission.missing
+      });
 
-    expect(response.statusCode).toBe(403);
-    expect(body.code).toBe("FORBIDDEN");
-    expect(body.requiredPermission).toBe(missingPermission);
-  });
+      expect(response.statusCode).toBe(403);
+      expect(body.code).toBe("FORBIDDEN");
+      expect(body.requiredPermission).toBe(permission.missing);
+    }
+  );
 
   it("does not introduce public or product routes", async () => {
-    const app = guarded();
+    const app = protectedApp();
 
     expect(
       app.hasRoute({
