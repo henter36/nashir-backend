@@ -490,7 +490,13 @@ This readiness gate does not authorize:
 - Merged Product Data Model and Migration Planning Gate.
 - Merged Product Persistence Strategy Decision Gate.
 - Merged Product Route Implementation Boundary Planning Gate.
+- Merged Permission Guard Error Disclosure Mapping Decision Gate.
+- Merged Permission Representation Decision Gate.
+- Merged Product Route Inventory Review Gate.
+- Accepted OpenAPI authority repository: `henter36/nashir`.
+- Accepted CI-active Backend Slice 0 authority pin: `36da9ed31903562bddfb7ffd669841956e334a51`.
 - Existing direct `pg` planning direction.
+- Existing backend runtime and guard harness state.
 - Existing non-authorization of implementation.
 
 ### Outputs
