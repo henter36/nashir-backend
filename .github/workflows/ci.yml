@@ -21,8 +21,8 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: nashir
-          POSTGRES_PASSWORD: nashir
           POSTGRES_DB: nashir_test
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -82,5 +82,5 @@ jobs:
       - name: Test DB migrations
         working-directory: nashir-backend
         env:
-          TEST_DATABASE_URL: postgresql://nashir:nashir@127.0.0.1:5432/nashir_test
+          TEST_DATABASE_URL: postgresql://nashir@127.0.0.1:5432/nashir_test
         run: pnpm run test:db
