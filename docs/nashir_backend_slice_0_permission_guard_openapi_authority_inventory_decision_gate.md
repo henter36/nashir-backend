@@ -422,7 +422,7 @@ The next gate should confirm whether OpenAPI authority is local, external, defer
 
 The next gate should recommend whether the following gate should be:
 
-- Generated artifact inventory review;
+- generated artifact inventory review;
 - product route inventory review;
 - permission representation decision;
 - error/disclosure mapping decision;
