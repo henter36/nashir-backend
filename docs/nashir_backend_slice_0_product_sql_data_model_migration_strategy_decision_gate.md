@@ -288,7 +288,7 @@ Decision: Future product SQL planning must include workspace ownership at the pe
 Rationale:
 
 - `workspaceId` is required in `Product`.
-- workspaceId is path-derived.
+- `workspaceId` is path-derived.
 - all product routes are workspace-scoped.
 - product lookup must not rely on `productId` alone.
 
@@ -644,6 +644,7 @@ This product SQL data model and migration strategy decision gate does not author
 - Merged Product Data Model Authority Review Gate.
 - Merged Product Data Model and Migration Planning Gate.
 - Merged Product Persistence Strategy Decision Gate.
+- Merged Product Route Implementation Boundary Planning Gate.
 - Accepted OpenAPI product schema inventory.
 - Existing direct `pg` planning direction.
 - Existing non-authorization of implementation.
