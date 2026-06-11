@@ -193,7 +193,7 @@ This gate does not create repository files.
 
 ## 11. Idempotency Persistence Decision
 
-Decision: idempotency persistence is required before implementing `createProduct`.
+Decision: Idempotency persistence is required before implementing `createProduct`.
 
 Reason:
 
@@ -214,7 +214,7 @@ This gate does not implement idempotency storage.
 
 ## 12. Optimistic Concurrency Persistence Decision
 
-Decision: optimistic concurrency persistence is required before implementing `updateProduct`.
+Decision: Optimistic concurrency persistence is required before implementing `updateProduct`.
 
 Reason:
 
@@ -233,7 +233,7 @@ This gate does not implement optimistic concurrency.
 
 ## 13. Audit Persistence Decision
 
-Decision: audit persistence is required before implementing product write operations.
+Decision: Audit persistence is required before implementing product write operations.
 
 Applies to:
 
@@ -256,7 +256,7 @@ This gate does not implement audit storage.
 
 ## 14. Product Route Eligibility Decision
 
-Decision: product route implementation remains NOT ELIGIBLE after this gate.
+Decision: Product route implementation remains NOT ELIGIBLE after this gate.
 
 Reason:
 
