@@ -195,9 +195,9 @@ Do not use the internal harness route as product API contract authority.
 | Direct OpenAPI source file | unresolved | Authority candidate | inventory required before mutation |
 | OpenAPI planning docs | present as planning evidence | Planning evidence | usable for sequencing only |
 | ErrorModel references | present as contract references | Authority reference / planning evidence | authority source unresolved |
-| generated artifacts | unresolved | Generated / derived candidate | read-only until authorized |
-| runtime route files | present | Non-authority for contract | do not treat as OpenAPI authority |
-| internal harness route | present | Non-authority for product API | do not treat as product contract |
+| Generated artifacts | unresolved | Generated / derived candidate | read-only until authorized |
+| Runtime route files | present | Non-authority for contract | do not treat as OpenAPI authority |
+| Internal harness route | present | Non-authority for product API | do not treat as product contract |
 
 ## 8. Contract Drift Review
 
@@ -318,17 +318,17 @@ Review result: NO-GO.
 
 Current unresolved gaps:
 
-- direct OpenAPI authority file location unresolved;
+- Direct OpenAPI authority file location unresolved;
 - OpenAPI mutation rules unresolved;
 - ErrorModel authority source unresolved;
-- generated artifact inventory unresolved;
-- generated client impact unresolved;
-- workspace-scoped path authority unresolved;
-- product route inventory unresolved;
-- permission representation unresolved;
-- error/disclosure mapping unresolved;
-- first eligible product route slice unresolved;
-- persistent RBAC model unresolved.
+- Generated artifact inventory unresolved;
+- Generated client impact unresolved;
+- Workspace-scoped path authority unresolved;
+- Product route inventory unresolved;
+- Permission representation unresolved;
+- Error/disclosure mapping unresolved;
+- First eligible product route slice unresolved;
+- Persistent RBAC model unresolved.
 
 ## 16. Review Decision
 
