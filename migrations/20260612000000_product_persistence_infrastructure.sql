@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS products (
   workspace_id text NOT NULL,
   name text NOT NULL CHECK (char_length(name) > 0),
   category text,
-  price numeric(12, 2) CHECK (price IS NULL OR price >= 0),
+  price numeric CHECK (price IS NULL OR price >= 0),
   sku text,
   stock_status text NOT NULL DEFAULT 'unknown' CHECK (
     stock_status IN ('available', 'limited', 'out_of_stock', 'unknown')
@@ -50,8 +50,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
   actor_id text NOT NULL,
   workspace_id text NOT NULL,
   resource_type text NOT NULL,
-  product_id text,
-  action_name text NOT NULL CHECK (action_name IN ('product.create', 'product.update')),
+  resource_id text,
+  action_name text NOT NULL CHECK (char_length(action_name) > 0),
   before_state jsonb,
   after_state jsonb,
   request_id text,
@@ -61,8 +61,8 @@ CREATE TABLE IF NOT EXISTS audit_events (
 CREATE INDEX IF NOT EXISTS audit_events_workspace_created_at_idx
   ON audit_events (workspace_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS audit_events_product_created_at_idx
-  ON audit_events (product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audit_events_resource_created_at_idx
+  ON audit_events (resource_id, created_at DESC);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS trigger AS $$
