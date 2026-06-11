@@ -23,7 +23,7 @@ CREATE INDEX IF NOT EXISTS products_workspace_status_idx
   ON products (workspace_id, status);
 
 CREATE INDEX IF NOT EXISTS products_workspace_updated_at_idx
-  ON products (workspace_id, updated_at DESC, product_id);
+  ON products (workspace_id, updated_at DESC, product_id DESC);
 
 CREATE TABLE IF NOT EXISTS idempotency_records (
   idempotency_record_id bigserial PRIMARY KEY,
@@ -63,3 +63,25 @@ CREATE INDEX IF NOT EXISTS audit_events_workspace_created_at_idx
 
 CREATE INDEX IF NOT EXISTS audit_events_product_created_at_idx
   ON audit_events (product_id, created_at DESC);
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
+
+CREATE TRIGGER update_products_updated_at
+  BEFORE UPDATE ON products
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_idempotency_records_updated_at ON idempotency_records;
+
+CREATE TRIGGER update_idempotency_records_updated_at
+  BEFORE UPDATE ON idempotency_records
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();

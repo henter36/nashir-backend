@@ -16,11 +16,27 @@ function getTestDatabaseUrl(): string {
     throw new Error("TEST_DATABASE_URL is required for migration DB tests");
   }
 
-  const databaseName = new URL(testDatabaseUrl).pathname.replace(/^\//u, "");
+  let databaseName = "";
 
-  if (!databaseName.includes("test")) {
+  try {
+    if (
+      testDatabaseUrl.startsWith("postgres://") ||
+      testDatabaseUrl.startsWith("postgresql://")
+    ) {
+      databaseName = new URL(testDatabaseUrl).pathname.replace(/^\//u, "");
+    } else {
+      const match = testDatabaseUrl.match(/(?:^|\s)dbname\s*=\s*([^\s]+)/u);
+      if (match?.[1]) {
+        databaseName = match[1].replace(/^['"]|['"]$/gu, "");
+      }
+    }
+  } catch {
+    databaseName = "";
+  }
+
+  if (!databaseName || !databaseName.includes("test")) {
     throw new Error(
-      `Refusing to reset non-test database "${databaseName}" in migration tests`
+      `Refusing to reset non-test database "${databaseName || "unknown"}" in migration tests`
     );
   }
 

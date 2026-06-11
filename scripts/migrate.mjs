@@ -166,7 +166,17 @@ async function applyMigrations(client) {
       appliedCount += 1;
       console.log(`Applied: ${migration.filename}`);
     } catch (error) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error(
+          "Failed to rollback transaction:",
+          rollbackError instanceof Error
+            ? rollbackError.message
+            : String(rollbackError)
+        );
+      }
+
       throw error;
     }
   }
