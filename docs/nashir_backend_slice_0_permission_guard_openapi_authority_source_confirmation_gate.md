@@ -508,6 +508,7 @@ This source confirmation gate does not authorize:
 
 - Merged OpenAPI Authority Inventory Decision Gate.
 - Merged OpenAPI Authority Inventory Review Gate.
+- Merged OpenAPI RBAC Contract Alignment Decision Gate.
 - Contract validation scripts.
 - Existing Auth0 identity-only boundary.
 - Existing route/path workspace boundary.
