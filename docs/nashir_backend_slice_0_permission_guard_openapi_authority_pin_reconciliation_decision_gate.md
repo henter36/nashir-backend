@@ -243,7 +243,7 @@ Reason:
 
 Validation script changes are code changes. They require explicit future authorization after planning and review.
 
-Candidate files that may need future planning only:
+Candidate files that may be subject to future modification planning:
 
 - `scripts/validate-contract-authority.mjs`
 - `scripts/validate-contracts.mjs`
@@ -459,9 +459,10 @@ This decision gate does not authorize:
 - Merged OpenAPI RBAC Contract Alignment Decision Gate.
 - Contract validation scripts.
 - Existing Auth0 identity-only boundary.
-- Existing route/path workspace boundary.
-- Existing permission guard primitive.
-- Existing internal harness execution.
+- Existing route/path `workspaceId` authority.
+- Existing workspace-before-permission ordering.
+- Existing membership-before-permission ordering.
+- Existing internal harness-only permission guard app wiring.
 - Existing contract-first governance.
 
 ### Outputs
