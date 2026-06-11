@@ -453,7 +453,7 @@ This table is a conceptual mapping only.
 
 No SQL column names are authorized.
 
-## 16. Contract Drift Findings
+## 16. Schema Asymmetry Findings
 
 Findings:
 
