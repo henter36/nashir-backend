@@ -266,17 +266,17 @@ Suggested local commands:
 git status -sb
 git log --oneline -5
 git show --stat HEAD
-git grep -n "PINNED_AUTHORITY_SHA\|EXPECTED_AUTHORITY_COMMIT\|AUTHORITY_FILES\|REQUIRED_CONTRACT_FILES"
-git grep -n "validate:contract-authority\|validate:contracts"
-git grep -n "NASHIR_AUTHORITY_REPO\|--authority-repo"
+git grep -E -n "PINNED_AUTHORITY_SHA|EXPECTED_AUTHORITY_COMMIT|AUTHORITY_FILES|REQUIRED_CONTRACT_FILES"
+git grep -E -n "validate:contract-authority|validate:contracts"
+git grep -E -n "NASHIR_AUTHORITY_REPO|--authority-repo"
 git diff --check
 ```
 
 If reviewing CI behavior:
 
 ```bash
-find .github/workflows -type f -maxdepth 2 -print
-grep -R "validate:contract-authority\|validate:contracts" .github/workflows || true
+find .github/workflows -maxdepth 2 -type f -print
+grep -E -R "validate:contract-authority|validate:contracts" .github/workflows || true
 ```
 
 These commands are review-only.
