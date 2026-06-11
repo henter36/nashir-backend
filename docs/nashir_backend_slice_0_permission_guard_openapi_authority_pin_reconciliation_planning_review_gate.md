@@ -204,8 +204,8 @@ The evidence review gate must produce:
 - list of exact required authority files found;
 - list of exact package validation commands found;
 - list of CI validation commands found;
-- classification of `validate-contract-authority.mjs`;
-- classification of `validate-contracts.mjs`;
+- classification of `scripts/validate-contract-authority.mjs`;
+- classification of `scripts/validate-contracts.mjs`;
 - classification of each pin as current, legacy, intentionally split, or unresolved;
 - classification of each file set as current, legacy, intentionally split, or unresolved;
 - risk assessment of keeping the current split;
