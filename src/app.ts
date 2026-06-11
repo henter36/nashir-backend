@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import Fastify, {
   type FastifyInstance,
+  type FastifyReply,
   type FastifyRequest,
   type FastifyServerOptions
 } from "fastify";
@@ -34,6 +35,8 @@ const WORKSPACE_ROUTE_HARNESS_ROUTE =
   "/internal/workspace-route-harness/:workspaceId";
 const PERMISSION_GUARD_HARNESS_ROUTE =
   "/internal/permission-guard-harness/:requiredPermission";
+const WORKSPACE_PERMISSION_GUARD_HARNESS_ROUTE =
+  "/internal/workspace-permission-guard-harness/:workspaceId/:requiredPermission";
 
 const STATIC_HARNESS_GRANTED_PERMISSIONS = Object.freeze([
   "harness.read",
@@ -46,6 +49,16 @@ interface WorkspaceRouteHarnessParams {
 
 interface PermissionGuardHarnessQuery {
   disclosureMode?: string;
+}
+
+interface WorkspacePermissionGuardHarnessParams {
+  workspaceId: string;
+  requiredPermission: string;
+}
+
+interface WorkspacePermissionGuardHarnessQuery {
+  disclosureMode?: string;
+  resourceWorkspaceId?: string;
 }
 
 async function workspaceRouteHarnessHandler(
@@ -84,6 +97,54 @@ async function permissionGuardHarnessHandler(
   });
 
   return { ok: true, decision };
+}
+
+async function workspacePermissionGuardHarnessHandler(
+  request: FastifyRequest<{
+    Params: WorkspacePermissionGuardHarnessParams;
+    Querystring: WorkspacePermissionGuardHarnessQuery;
+  }>,
+  reply: FastifyReply
+) {
+  const requestContext = request.requestContext;
+
+  if (!requestContext?.actorId || !requestContext.workspaceId) {
+    const errorResponse = createHttpErrorResponse({
+      code: "REQUEST_CONTEXT_REQUIRED",
+      message: "Resolved request context required.",
+      statusCode: 500,
+      correlationId:
+        request.correlationId ?? resolveCorrelationId(request.headers)
+    });
+
+    return reply.code(errorResponse.statusCode).send(errorResponse.body);
+  }
+
+  const disclosureMode =
+    request.query.disclosureMode === "non_disclosing"
+      ? "non_disclosing"
+      : "disclosing";
+
+  const decision = evaluatePermissionGuard({
+    requiredPermission: request.params.requiredPermission,
+    grantedPermissions: STATIC_HARNESS_GRANTED_PERMISSIONS,
+    requestContext,
+    resourceWorkspaceId: request.query.resourceWorkspaceId,
+    disclosureMode
+  });
+
+  if (!decision.ok) {
+    return reply.code(decision.statusCode).send(decision);
+  }
+
+  return {
+    ok: true,
+    workspaceId: request.params.workspaceId,
+    requiredPermission: decision.requiredPermission,
+    decision: decision.decision,
+    requestContext: decision.requestContext,
+    correlationId: request.correlationId ?? null
+  };
 }
 
 function resolveCorrelationId(headers: FastifyRequest["headers"]): string {
@@ -206,6 +267,24 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
 
   if (enableInternalPermissionGuardHarnessRoutes === true) {
     app.get(PERMISSION_GUARD_HARNESS_ROUTE, permissionGuardHarnessHandler);
+
+    const workspacePermissionGuardHarnessOptions: {
+      preHandler?: NonNullable<typeof workspaceContextGuardHook>;
+    } = {};
+
+    if (workspaceContextGuardHook) {
+      workspacePermissionGuardHarnessOptions.preHandler =
+        workspaceContextGuardHook;
+    }
+
+    app.get<{
+      Params: WorkspacePermissionGuardHarnessParams;
+      Querystring: WorkspacePermissionGuardHarnessQuery;
+    }>(
+      WORKSPACE_PERMISSION_GUARD_HARNESS_ROUTE,
+      workspacePermissionGuardHarnessOptions,
+      workspacePermissionGuardHarnessHandler
+    );
   }
 
   app.setNotFoundHandler(async (request, reply) => {
