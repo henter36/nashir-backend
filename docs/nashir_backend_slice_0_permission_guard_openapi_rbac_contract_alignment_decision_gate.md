@@ -481,6 +481,7 @@ The next gate should inventory the OpenAPI authority surface and decide whether 
 - Error/disclosure mapping unresolved.
 - Persistent RBAC unresolved.
 - Generated client impact unresolved.
+- First eligible product route slice unresolved.
 
 ### Transition Decision
 
