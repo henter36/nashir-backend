@@ -22,7 +22,7 @@ This gate does not authorize public route implementation.
 
 This gate does not authorize product route implementation.
 
-This gate does not authorize DB, ORThisigrations, deployment, secrets, UI, workflow, or formatting baseline cleanup.
+This gate does not authorize DB, ORM, migrations, deployment, secrets, UI, workflow, or formatting baseline cleanup.
 
 ## 2. Inputs Reviewed
 
