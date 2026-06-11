@@ -156,8 +156,9 @@ Rules:
 - 404 must not distinguish missing resource from invisible resource.
 - 404 must not distinguish missing workspace from inaccessible workspace.
 - 404 must not distinguish cross-workspace product from missing product.
-- 404 must not reveal whether `workspaceId` is valid.
-- 404 must not reveal whether `productId` is valid.
+- 404 must not reveal whether `workspaceId` exists, is visible to the actor, or is associated with the actor after syntactic route validation has passed.
+- 404 must not reveal whether `productId` exists or belongs to the requested workspace after syntactic route validation has passed.
+- Syntactically malformed route parameters may still be rejected with 400. This does not authorize semantic existence disclosure.
 - 404 must use a generic message such as `Resource not found.`
 - 404 must use the accepted error response model.
 
@@ -260,9 +261,10 @@ Expected order:
 
 1. `authGuard`
 2. `workspaceContextGuard`
-3. `nonDisclosingMembershipCheck`
-4. `permissionGuard`
-5. resource lookup / ownership verification
+   - Current implementation combines route workspace resolution with the non-disclosing membership check by calling the membership resolver and returning a non-disclosing 404 for missing workspace membership.
+   - Future implementation planning may either preserve this combined hook or explicitly split membership behavior into a separate `nonDisclosingMembershipCheck`; any split requires explicit authorization in the implementation planning gate.
+3. `permissionGuard`
+4. resource lookup / ownership verification
 
 Applies to:
 
@@ -275,13 +277,14 @@ Expected order:
 
 1. `authGuard`
 2. `workspaceContextGuard`
-3. `nonDisclosingMembershipCheck`
-4. `permissionGuard`
-5. `rejectBodyWorkspaceId`
-6. validation
-7. idempotency or optimistic concurrency check
-8. persistence
-9. audit
+   - Current implementation combines route workspace resolution with the non-disclosing membership check by calling the membership resolver and returning a non-disclosing 404 for missing workspace membership.
+   - Future implementation planning may either preserve this combined hook or explicitly split membership behavior into a separate `nonDisclosingMembershipCheck`; any split requires explicit authorization in the implementation planning gate.
+3. `permissionGuard`
+4. `rejectBodyWorkspaceId`
+5. validation
+6. idempotency or optimistic concurrency check
+7. persistence
+8. audit
 
 Applies to:
 
