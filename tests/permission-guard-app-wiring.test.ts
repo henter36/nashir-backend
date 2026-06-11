@@ -81,8 +81,8 @@ function appWith(options: BuildAppOptions): FastifyInstance {
 }
 
 function workspacePermissionPath(
-  requiredPermission = permission.allowed,
-  workspaceId = workspace.route
+  requiredPermission: string = permission.allowed,
+  workspaceId: string = workspace.route
 ): string {
   return `/internal/workspace-permission-guard-harness/${workspaceId}/${requiredPermission}`;
 }

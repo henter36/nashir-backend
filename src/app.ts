@@ -66,7 +66,7 @@ async function workspaceRouteHarnessHandler(
 ) {
   return {
     ok: true,
-    workspaceId: requestContext.workspaceId,
+    workspaceId: request.params.workspaceId,
     requestContext: {
       workspaceId: request.requestContext?.workspaceId ?? null,
       actorId: request.requestContext?.actorId ?? null
