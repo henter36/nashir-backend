@@ -135,7 +135,7 @@ Required behavior:
 - read a product by `workspaceId` and `productId`;
 - update a product by `workspaceId` and `productId`;
 - create a product with server-provided `workspaceId`;
-- never accept `workspaceId` from request body shape;
+- require `workspaceId` as an explicit parameter from the calling service;
 - never return a product from a different workspace.
 
 Cross-workspace access remains forbidden.
