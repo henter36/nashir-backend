@@ -1,92 +1,32 @@
-import { execFileSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ProductRepository } from "../../src/products/product-repository.js";
+import {
+  getRequiredTestDatabaseUrl,
+  resetDatabase,
+  runMigrationsForTestDatabase,
+  truncateProductData
+} from "../helpers/test-db.js";
 
 const { Pool } = pg;
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeDb = testDatabaseUrl ? describe : describe.skip;
-const repositoryRoot = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../.."
-);
-
-function getTestDatabaseUrl(): string {
-  if (!testDatabaseUrl) {
-    throw new Error(
-      "TEST_DATABASE_URL is required for product repository tests"
-    );
-  }
-
-  let databaseName = "";
-
-  try {
-    if (
-      testDatabaseUrl.startsWith("postgres://") ||
-      testDatabaseUrl.startsWith("postgresql://")
-    ) {
-      databaseName = new URL(testDatabaseUrl).pathname.replace(/^\//u, "");
-    } else {
-      const match = testDatabaseUrl.match(/(?:^|\s)dbname\s*=\s*([^\s]+)/u);
-      if (match?.[1]) {
-        databaseName = match[1].replace(/^['"]|['"]$/gu, "");
-      }
-    }
-  } catch {
-    databaseName = "";
-  }
-
-  if (!databaseName || !databaseName.includes("test")) {
-    throw new Error(
-      `Refusing to use non-test database "${databaseName || "unknown"}" in product repository tests`
-    );
-  }
-
-  return testDatabaseUrl;
-}
-
-function runMigrations() {
-  execFileSync(process.execPath, ["scripts/migrate.mjs", "up"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      TEST_DATABASE_URL: getTestDatabaseUrl()
-    }
-  });
-}
-
-async function resetDatabase(pool: pg.Pool) {
-  await pool.query(`
-    DROP TABLE IF EXISTS
-      audit_events,
-      idempotency_records,
-      products,
-      schema_migrations
-    CASCADE;
-  `);
-}
-
-async function truncateProductData(pool: pg.Pool) {
-  await pool.query("TRUNCATE TABLE products RESTART IDENTITY CASCADE;");
-}
 
 describeDb("ProductRepository", () => {
   let pool: pg.Pool;
   let repository: ProductRepository;
 
   beforeAll(async () => {
+    const databaseUrl = getRequiredTestDatabaseUrl("product repository tests");
+
     pool = new Pool({
-      connectionString: getTestDatabaseUrl()
+      connectionString: databaseUrl
     });
 
     await resetDatabase(pool);
-    runMigrations();
+    runMigrationsForTestDatabase(databaseUrl);
 
     repository = new ProductRepository(pool);
   });

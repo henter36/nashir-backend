@@ -1,3 +1,11 @@
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue =
+  | JsonPrimitive
+  | JsonValue[]
+  | {
+      [key: string]: JsonValue;
+    };
+
 export const IDEMPOTENCY_STATUSES = [
   "in_progress",
   "completed",
@@ -15,7 +23,7 @@ export interface IdempotencyRecord {
   requestFingerprint: string;
   status: IdempotencyStatus;
   responseStatusCode: number | null;
-  responseBody: unknown | null;
+  responseBody: JsonValue | null;
   resourceId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -46,11 +54,11 @@ export type ReserveIdempotencyRecordResult =
 
 export interface CompleteIdempotencyRecordInput extends IdempotencyScope {
   responseStatusCode: number;
-  responseBody: unknown;
+  responseBody: JsonValue;
   resourceId?: string | null;
 }
 
 export interface FailIdempotencyRecordInput extends IdempotencyScope {
   responseStatusCode?: number | null;
-  responseBody?: unknown | null;
+  responseBody?: JsonValue | null;
 }

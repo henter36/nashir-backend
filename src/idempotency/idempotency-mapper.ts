@@ -1,6 +1,7 @@
 import type {
   IdempotencyRecord,
-  IdempotencyStatus
+  IdempotencyStatus,
+  JsonValue
 } from "./idempotency-types.js";
 
 export interface IdempotencyRecordRow {
@@ -12,7 +13,7 @@ export interface IdempotencyRecordRow {
   request_fingerprint: string;
   status: IdempotencyStatus;
   response_status_code: number | null;
-  response_body: unknown | null;
+  response_body: JsonValue | null;
   resource_id: string | null;
   created_at: Date | string;
   updated_at: Date | string;
