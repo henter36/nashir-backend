@@ -241,4 +241,40 @@ describeDb("IdempotencyRepository", () => {
 
     expect(result).toBeNull();
   });
+
+  it("allows reserving an expired record again", async () => {
+    const expiredAt = new Date(Date.now() - 10_000).toISOString();
+
+    const first = await repository.reserveIdempotencyRecord({
+      workspaceId: "workspace-a",
+      actorId: "actor-a",
+      operationName: "product.create",
+      idempotencyKey: "expired-key",
+      requestFingerprint: "fingerprint-1",
+      expiresAt: expiredAt
+    });
+
+    expect(first.status).toBe("created");
+
+    const second = await repository.reserveIdempotencyRecord({
+      workspaceId: "workspace-a",
+      actorId: "actor-a",
+      operationName: "product.create",
+      idempotencyKey: "expired-key",
+      requestFingerprint: "fingerprint-2",
+      expiresAt: new Date(Date.now() + 10_000).toISOString()
+    });
+
+    expect(second.status).toBe("created");
+    expect(second.record.requestFingerprint).toBe("fingerprint-2");
+
+    const activeRecord = await repository.getIdempotencyRecord({
+      workspaceId: "workspace-a",
+      actorId: "actor-a",
+      operationName: "product.create",
+      idempotencyKey: "expired-key"
+    });
+
+    expect(activeRecord?.requestFingerprint).toBe("fingerprint-2");
+  });
 });

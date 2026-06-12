@@ -25,7 +25,7 @@ export function getRequiredTestDatabaseUrl(testName: string): string {
     databaseName = "";
   }
 
-  if (!databaseName || !databaseName.includes("test")) {
+  if (!databaseName?.includes("test")) {
     throw new Error(
       `Refusing to use non-test database "${databaseName || "unknown"}" in ${testName}`
     );

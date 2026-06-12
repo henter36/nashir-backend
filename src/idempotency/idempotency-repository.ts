@@ -43,7 +43,15 @@ export class IdempotencyRepository {
           operation_name,
           idempotency_key
         )
-        DO NOTHING
+        DO UPDATE SET
+          request_fingerprint = EXCLUDED.request_fingerprint,
+          status = 'in_progress',
+          expires_at = EXCLUDED.expires_at,
+          response_status_code = NULL,
+          response_body = NULL,
+          resource_id = NULL,
+          updated_at = NOW()
+        WHERE idempotency_records.expires_at < NOW()
         RETURNING *;
       `,
       [
@@ -89,7 +97,8 @@ export class IdempotencyRepository {
         WHERE workspace_id = $1
           AND actor_id = $2
           AND operation_name = $3
-          AND idempotency_key = $4;
+          AND idempotency_key = $4
+          AND (expires_at IS NULL OR expires_at > NOW());
       `,
       [
         scope.workspaceId,
@@ -127,7 +136,9 @@ export class IdempotencyRepository {
         input.operationName,
         input.idempotencyKey,
         input.responseStatusCode,
-        JSON.stringify(input.responseBody),
+        input.responseBody === undefined || input.responseBody === null
+          ? null
+          : JSON.stringify(input.responseBody),
         input.resourceId ?? null
       ]
     );
@@ -159,7 +170,7 @@ export class IdempotencyRepository {
         input.operationName,
         input.idempotencyKey,
         input.responseStatusCode ?? null,
-        input.responseBody === undefined
+        input.responseBody === undefined || input.responseBody === null
           ? null
           : JSON.stringify(input.responseBody)
       ]
