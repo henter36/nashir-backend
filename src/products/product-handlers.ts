@@ -43,6 +43,16 @@ function parsePositiveInteger(value: unknown): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function isInvalidCursorError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.message === "Invalid product list cursor" ||
+      ("code" in err &&
+        ((err as { code?: unknown }).code === "22007" ||
+          (err as { code?: unknown }).code === "22P02")))
+  );
+}
+
 function sendError(
   reply: FastifyReply,
   statusCode: number,
@@ -370,10 +380,7 @@ export function createListProductsHandler(deps: {
         sort: q.sort as SortDirection | undefined
       });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        err.message === "Invalid product list cursor"
-      ) {
+      if (isInvalidCursorError(err)) {
         sendBadRequest(reply, "Invalid cursor.", request.correlationId);
         return;
       }
