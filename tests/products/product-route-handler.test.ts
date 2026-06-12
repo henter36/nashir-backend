@@ -1,27 +1,13 @@
 import process from "node:process";
 import pg from "pg";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it
-} from "vitest";
-import {
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  SignJWT
-} from "jose";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import type { FastifyInstance, InjectOptions } from "fastify";
 
 import { buildApp } from "../../src/app.js";
 import type { AuthConfig } from "../../src/auth-config.js";
 import type { JwksGetKey } from "../../src/auth-guard.js";
-import type {
-  WorkspaceMembershipResolver
-} from "../../src/workspace-context-guard.js";
+import type { WorkspaceMembershipResolver } from "../../src/workspace-context-guard.js";
 import { IdempotencyRepository } from "../../src/idempotency/idempotency-repository.js";
 import { ProductRepository } from "../../src/products/product-repository.js";
 import {
@@ -189,7 +175,11 @@ describeDb("Product Route Handlers", () => {
     app: FastifyInstance,
     options: InjectOptions & { actorId?: string }
   ) {
-    const { actorId = KNOWN_ACTOR, headers: extraHeaders = {}, ...rest } = options;
+    const {
+      actorId = KNOWN_ACTOR,
+      headers: extraHeaders = {},
+      ...rest
+    } = options;
     const token = await bearerToken(actorId);
     const response = await app.inject({
       headers: {

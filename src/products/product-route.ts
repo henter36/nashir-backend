@@ -1,4 +1,9 @@
-import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyPluginAsync,
+  FastifyReply,
+  FastifyRequest
+} from "fastify";
 
 import type { IdempotencyRepository } from "../idempotency/idempotency-repository.js";
 import type { ProductRepository } from "./product-repository.js";
@@ -30,8 +35,11 @@ export const productPlugin: FastifyPluginAsync<ProductPluginOptions> =
     fastify: FastifyInstance,
     opts: ProductPluginOptions
   ): Promise<void> {
-    const { productRepository, idempotencyRepository, workspaceContextGuardHook } =
-      opts;
+    const {
+      productRepository,
+      idempotencyRepository,
+      workspaceContextGuardHook
+    } = opts;
 
     const preHandler = workspaceContextGuardHook
       ? [workspaceContextGuardHook]
@@ -42,7 +50,11 @@ export const productPlugin: FastifyPluginAsync<ProductPluginOptions> =
     fastify.get<{
       Params: ProductRouteParams;
       Querystring: ListProductsQuerystring;
-    }>(PRODUCTS_ROUTE, routeOpts, createListProductsHandler({ productRepository }));
+    }>(
+      PRODUCTS_ROUTE,
+      routeOpts,
+      createListProductsHandler({ productRepository })
+    );
 
     fastify.post<{
       Params: ProductRouteParams;

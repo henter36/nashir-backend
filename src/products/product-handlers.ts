@@ -54,9 +54,7 @@ function sortObjectKeys(value: unknown): unknown {
       .sort()
       .reduce(
         (acc, key) => {
-          acc[key] = sortObjectKeys(
-            (value as Record<string, unknown>)[key]
-          );
+          acc[key] = sortObjectKeys((value as Record<string, unknown>)[key]);
           return acc;
         },
         {} as Record<string, unknown>
@@ -85,22 +83,15 @@ function computeFingerprint(params: {
 function buildCreateInput(body: Record<string, unknown>): CreateProductInput {
   return {
     name: body.name as string,
-    category:
-      "category" in body ? (body.category as string | null) : undefined,
+    category: "category" in body ? (body.category as string | null) : undefined,
     price: "price" in body ? (body.price as number | null) : undefined,
     sku: "sku" in body ? (body.sku as string | null) : undefined,
     stockStatus:
-      "stockStatus" in body
-        ? (body.stockStatus as StockStatus)
-        : undefined,
-    imageUrl:
-      "imageUrl" in body ? (body.imageUrl as string | null) : undefined,
-    videoUrl:
-      "videoUrl" in body ? (body.videoUrl as string | null) : undefined,
+      "stockStatus" in body ? (body.stockStatus as StockStatus) : undefined,
+    imageUrl: "imageUrl" in body ? (body.imageUrl as string | null) : undefined,
+    videoUrl: "videoUrl" in body ? (body.videoUrl as string | null) : undefined,
     description:
-      "description" in body
-        ? (body.description as string | null)
-        : undefined,
+      "description" in body ? (body.description as string | null) : undefined,
     status: "status" in body ? (body.status as ProductStatus) : undefined
   };
 }
@@ -300,7 +291,11 @@ export function createCreateProductHandler(deps: {
 
     const rawKey = request.headers["idempotency-key"];
     const idempotencyKey =
-      typeof rawKey === "string" ? rawKey : Array.isArray(rawKey) ? rawKey[0] : undefined;
+      typeof rawKey === "string"
+        ? rawKey
+        : Array.isArray(rawKey)
+          ? rawKey[0]
+          : undefined;
 
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       sendError(
