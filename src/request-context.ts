@@ -1,12 +1,10 @@
 export const WORKSPACE_ID_HEADER = "x-nashir-workspace-id";
 export const ACTOR_ID_HEADER = "x-nashir-actor-id";
 export const CORRELATION_ID_HEADER = "x-nashir-correlation-id";
-export const GRANTED_PERMISSIONS_HEADER = "x-nashir-granted-permissions";
 
 export interface RequestContext {
   workspaceId: string;
   actorId: string;
-  grantedPermissions?: readonly string[];
 }
 
 export interface VerifiedIdentityContext {
@@ -15,7 +13,6 @@ export interface VerifiedIdentityContext {
 
 export interface FullyResolvedRequestContext extends VerifiedIdentityContext {
   workspaceId: string;
-  grantedPermissions?: readonly string[];
 }
 
 export interface RequestContextIssue {
@@ -45,21 +42,6 @@ type HeaderInspection =
   | { reason: "present"; value: string }
   | { reason: "missing" }
   | { reason: "blank" };
-
-function parseGrantedPermissions(inspection: HeaderInspection): readonly string[] {
-  if (inspection.reason !== "present") {
-    return [];
-  }
-
-  return [
-    ...new Set(
-      inspection.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0)
-    )
-  ];
-}
 
 function inspectHeader(headers: HeadersLike, name: string): HeaderInspection {
   let raw: string | readonly string[] | undefined = headers[name];
@@ -95,14 +77,9 @@ export function resolveRequestContextFromHeaders(
   const actor = inspectHeader(safeHeaders, ACTOR_ID_HEADER);
 
   if (workspace.reason === "present" && actor.reason === "present") {
-    const permissions = inspectHeader(safeHeaders, GRANTED_PERMISSIONS_HEADER);
     return {
       ok: true,
-      context: {
-        workspaceId: workspace.value,
-        actorId: actor.value,
-        grantedPermissions: parseGrantedPermissions(permissions)
-      }
+      context: { workspaceId: workspace.value, actorId: actor.value }
     };
   }
 
