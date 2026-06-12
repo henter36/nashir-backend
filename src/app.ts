@@ -21,6 +21,9 @@ import {
   type RequestContext,
   type VerifiedIdentityContext
 } from "./request-context.js";
+import type { IdempotencyRepository } from "./idempotency/idempotency-repository.js";
+import type { ProductRepository } from "./products/product-repository.js";
+import { productPlugin } from "./products/product-route.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -167,6 +170,8 @@ export interface BuildAppOptions extends FastifyServerOptions {
   authConfig?: AuthConfig;
   jwksGetKey?: JwksGetKey;
   workspaceMembershipResolver?: WorkspaceMembershipResolver;
+  productRepository?: ProductRepository;
+  idempotencyRepository?: IdempotencyRepository;
 }
 
 export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
@@ -176,6 +181,8 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     authConfig,
     jwksGetKey,
     workspaceMembershipResolver,
+    productRepository,
+    idempotencyRepository,
     ...fastifyOpts
   } = opts;
   const app = Fastify({ logger: true, ...fastifyOpts });
@@ -285,6 +292,14 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
       workspacePermissionGuardHarnessOptions,
       workspacePermissionGuardHarnessHandler
     );
+  }
+
+  if (productRepository && idempotencyRepository) {
+    app.register(productPlugin, {
+      productRepository,
+      idempotencyRepository,
+      workspaceContextGuardHook
+    });
   }
 
   app.setNotFoundHandler(async (request, reply) => {

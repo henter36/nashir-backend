@@ -1,6 +1,9 @@
 export const PRODUCT_STATUSES = ["draft", "active", "archived"] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
+export const SORT_DIRECTIONS = ["updatedAt:desc", "updatedAt:asc"] as const;
+export type SortDirection = (typeof SORT_DIRECTIONS)[number];
+
 export const STOCK_STATUSES = [
   "available",
   "limited",
@@ -56,6 +59,7 @@ export interface ListProductsInput {
   cursor?: string | null;
   status?: ProductStatus;
   updatedAfter?: string;
+  sort?: SortDirection;
 }
 
 export interface ListProductsResult {
