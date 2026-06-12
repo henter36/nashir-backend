@@ -243,7 +243,7 @@ The Idempotency Repository may support transaction participation.
 
 Allowed:
 
-- accept a `pg` client or transaction client where needed;
+- accept a `PgQueryable` client, or equivalent shared query interface, to support transaction participation consistently with ProductRepository;
 - use a pool for standalone repository operations;
 - participate in a caller-managed transaction.
 
