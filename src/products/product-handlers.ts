@@ -600,7 +600,6 @@ export function createCreateProductHandler(deps: {
     });
 
     reply.code(201).send(productResponse);
-    return;
   };
 }
 
@@ -685,7 +684,14 @@ export function createUpdateProductHandler(deps: {
         return;
       }
       expectedVersion = parsed;
-    } else if (xResourceVersion !== undefined) {
+    } else if (xResourceVersion === undefined) {
+      sendBadRequest(
+        reply,
+        "If-Match or X-Resource-Version header is required.",
+        request.correlationId
+      );
+      return;
+    } else {
       const raw = firstHeaderValue(xResourceVersion);
       const parsed = parsePositiveInteger(raw);
       if (parsed === null) {
@@ -697,13 +703,6 @@ export function createUpdateProductHandler(deps: {
         return;
       }
       expectedVersion = parsed;
-    } else {
-      sendBadRequest(
-        reply,
-        "If-Match or X-Resource-Version header is required.",
-        request.correlationId
-      );
-      return;
     }
 
     const body = request.body ?? {};
