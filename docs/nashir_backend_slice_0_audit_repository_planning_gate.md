@@ -30,26 +30,34 @@ This gate does not authorize implementation.
 | Product Route Handler implementation | Completed |
 | Product Route Handler Acceptance Gate | Completed |
 | Product Route Handler Acceptance Review Gate | Completed |
-3.3 Current Known Gap
+
+### 3.3 Current Known Gap
+
 The Product Route Handler implementation intentionally did not implement:
 * AuditRepository
 * Runtime audit event writing
 * Product create/update audit persistence
 This planning gate exists to decide the scope and boundaries of that future audit slice.
-4. Problem Statement
+
+## 4. Problem Statement
+
 Product route handlers now exist for product create/update behavior, but audit behavior remains deferred.
 This creates a compliance and traceability gap:
 * Product create/update actions can happen through backend routes.
 * The system does not yet have an accepted AuditRepository implementation slice.
 * Runtime audit event persistence is not yet accepted as complete.
-5. Planning Scope
+
+## 5. Planning Scope
+
 This gate plans a future repository-level audit implementation.
 The planned implementation target is:
 AuditRepository
 The planned audit persistence target is:
 audit_events
 The planned future slice should support writing audit records for backend-controlled product mutations.
-6. In-Scope for Future Implementation Planning
+
+## 6. In-Scope for Future Implementation Planning
+
 The future implementation slice may include planning for:
 * A new AuditRepository.
 * A typed audit event input model.
@@ -60,7 +68,9 @@ The future implementation slice may include planning for:
 * Tests for product route handler audit integration.
 * Failure behavior when audit persistence fails.
 * Boundary between audit persistence and product/idempotency transactions.
-7. Out of Scope for This Planning Gate
+
+## 7. Out of Scope for This Planning Gate
+
 This planning gate does not authorize:
 * Creating AuditRepository.
 * Modifying route handlers.
@@ -75,11 +85,15 @@ This planning gate does not authorize:
 * Implementing Auth0 permission mapping.
 * Implementing production WorkspaceMembershipResolver wiring.
 * Implementing idempotency failed retry/reclaim behavior.
-8. Required Decisions Before Implementation
-8.1 Audit Event Shape
+
+## 8. Required Decisions Before Implementation
+
+### 8.1 Audit Event Shape
+
 Decision required:
 Define the exact AuditRepository input contract.
 Minimum proposed fields:
+
 | Field | Purpose |
 | :--- | :--- |
 | `workspaceId` | Workspace boundary |
@@ -90,14 +104,19 @@ Minimum proposed fields:
 | `correlationId` | Request correlation identifier |
 | `metadata` | Additional structured event data |
 Proposed action names:
-Product OperationProposed Audit Action
-Product createdproduct.created
-Product updatedproduct.updated
+
+| Product Operation | Proposed Audit Action |
+| :--- | :--- |
+| Product created | `product.created` |
+| Product updated | `product.updated` |
 This is a proposal, not yet an implementation decision.
-8.2 Transaction Boundary
+
+### 8.2 Transaction Boundary
+
 Decision required:
 Choose whether audit writes must be in the same transaction as product mutation.
 Options:
+
 | Option | Meaning | Risk |
 | :--- | :--- | :--- |
 | Same transaction | Product change and audit write commit/fail together | Strong consistency, but audit failures block product mutation |
@@ -107,7 +126,9 @@ Recommended for V1:
 Same transaction for product create/update audit events.
 Reason:
 V1 needs a simple and reviewable audit guarantee for product mutations.
-8.3 Audit Failure Behavior
+
+### 8.3 Audit Failure Behavior
+
 Decision required:
 Define what happens if audit write fails.
 Proposed V1 behavior:
@@ -116,47 +137,63 @@ Proposed V1 behavior:
 * Do not silently ignore audit failures.
 Rationale:
 If a route is contractually audit-required, silent audit failure creates compliance drift.
-8.4 Idempotency Interaction
+
+### 8.4 Idempotency Interaction
+
 Decision required:
 Define create-product idempotency interaction with audit writes.
 Proposed V1 behavior:
 * First successful create writes one audit event.
 * Idempotency replay returns stored response and does not write a second audit event.
 * Failed idempotency retry policy remains out of scope unless separately authorized.
-8.5 Update Conflict Interaction
+
+### 8.5 Update Conflict Interaction
+
 Decision required:
 Define audit behavior for product update conflicts.
 Proposed V1 behavior:
 * Successful update writes product.updated.
 * Version conflict does not write audit event because no product mutation occurred.
 * Not found does not write audit event because no product mutation occurred.
-8.6 Audit Metadata
+
+### 8.6 Audit Metadata
+
 Decision required:
 Define metadata included in audit event.
 Proposed V1 metadata for create:
-FieldMeaning
-productIdCreated product ID
-statusProduct status
-idempotencyKeyPresent for create requests
-versionCreated version
+
+| Field | Meaning |
+| :--- | :--- |
+| `productId` | Created product ID |
+| `status` | Product status |
+| `idempotencyKey` | Present for create requests |
+| `version` | Created version |
 Proposed V1 metadata for update:
-FieldMeaning
-productIdUpdated product ID
-previousVersionExpected version from request
-newVersionResulting product version
-changedFieldsNames of updated fields
+
+| Field | Meaning |
+| :--- | :--- |
+| `productId` | Updated product ID |
+| `previousVersion` | Expected version from request |
+| `newVersion` | Resulting product version |
+| `changedFields` | Names of updated fields |
 This is a proposal and must be reviewed before implementation.
-9. Proposed Future File Scope
+
+## 9. Proposed Future File Scope
+
 The future implementation gate may authorize a limited file set.
 Proposed files:
-FilePurpose
-src/audit/audit-repository.tsNew AuditRepository
-src/audit/audit-types.tsAudit input/result types
-tests/audit/audit-repository.test.tsRepository tests
-src/products/product-handlers.ts Wire audit writes into create/update only
-tests/products/product-route-handler.test.ts Add audit integration coverage
+
+| File | Purpose |
+| :--- | :--- |
+| `src/audit/audit-repository.ts` | New AuditRepository |
+| `src/audit/audit-types.ts` | Audit input/result types |
+| `tests/audit/audit-repository.test.ts` | Repository tests |
+| `src/products/product-handlers.ts` | Wire audit writes into create/update only |
+| `tests/products/product-route-handler.test.ts` | Add audit integration coverage |
 This is proposed only. It is not authorized by this planning gate.
-10. Proposed Blocklist
+
+## 10. Proposed Blocklist
+
 The future implementation gate should continue to block:
 * OpenAPI authority changes.
 * Generated client changes.
@@ -168,7 +205,9 @@ The future implementation gate should continue to block:
 * Package/dependency changes.
 * CI workflow changes.
 * UI work.
-11. Risks
+
+## 11. Risks
+
 | Risk | Status | Notes |
 | :--- | :--- | :--- |
 | Product mutations without audit persistence | Open | Main driver for this planning gate |
@@ -179,7 +218,9 @@ The future implementation gate should continue to block:
 | Audit metadata overcollection | Open | Metadata should be minimal and non-sensitive |
 | OpenAPI drift | Controlled | OpenAPI changes are out of scope |
 | Scope creep into Auth0 mapping | Controlled | Auth0 mapping remains separate |
-12. Legal / Compliance Review
+
+## 12. Legal / Compliance Review
+
 Audit events may contain operationally sensitive data.
 Planning constraints:
 * Do not store secrets.
@@ -188,7 +229,9 @@ Planning constraints:
 * Do not store unnecessary PII.
 * Store minimal structured metadata needed for traceability.
 * Keep workspace and actor boundaries clear.
-13. Recommended V1 Direction
+
+## 13. Recommended V1 Direction
+
 Recommended V1 planning decision:
 * Implement insert-only AuditRepository.
 * Use existing audit_events persistence target if already created by approved migrations.
@@ -197,23 +240,30 @@ Recommended V1 planning decision:
 * Write audit events inside the product mutation transaction if repository transaction support allows it.
 * Do not audit read/list endpoints in V1.
 * Do not change idempotency failed retry behavior in this slice.
-14. Acceptance Criteria for the Future Implementation Gate
+
+## 14. Acceptance Criteria for the Future Implementation Gate
+
 A future implementation gate should require:
-1. Exact file allowlist.
-2. Exact audit event input shape.
-3. Exact transaction behavior.
-4. Exact failure behavior.
-5. Tests for successful create audit.
-6. Tests for successful update audit.
-7. Tests proving idempotency replay does not duplicate audit event.
-8. Tests proving update conflict does not write audit event.
-9. Tests proving audit failure behavior.
-10. Confirmation that OpenAPI, generated clients, migrations, packages, and CI are untouched unless explicitly authorized.
-15. Decision
+
+* Exact file allowlist.
+* Exact audit event input shape.
+* Exact transaction behavior.
+* Exact failure behavior.
+* Tests for successful create audit.
+* Tests for successful update audit.
+* Tests proving idempotency replay does not duplicate audit event.
+* Tests proving update conflict does not write audit event.
+* Tests proving audit failure behavior.
+* Confirmation that OpenAPI, generated clients, migrations, packages, and CI are untouched unless explicitly authorized.
+
+## 15. Decision
+
 Decision: GO to AuditRepository Planning Review Gate.
 This gate authorizes only a planning review gate.
 This gate does not authorize AuditRepository implementation.
-16. Next Gate
+
+## 16. Next Gate
+
 Recommended next gate:
 Backend Slice 0 AuditRepository Planning Review Gate
 Purpose:
@@ -223,15 +273,22 @@ Purpose:
 * Decide metadata boundaries.
 * Decide whether implementation can proceed without a migration.
 * Produce an implementation authorization gate only if all required decisions are resolved.
-17. Verification Commands
+
+## 17. Verification Commands
+
 Run from repository root:
+
+```bash
 git checkout main
 git pull origin main
 git status -sb
 git log --oneline -5
 grep -R "AuditRepository" -n src tests docs || true
 grep -R "audit_events" -n src tests migrations docs || true
-18. Output
+```
+
+## 18. Output
+
 This gate produces:
 * A planning record for the future AuditRepository slice.
 * A list of decisions required before implementation.
