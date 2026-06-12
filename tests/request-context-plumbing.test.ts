@@ -505,61 +505,39 @@ describe("request-context plumbing on a gated non-health harness route", () => {
     expect(typeof body.correlationId).toBe("string");
     expect(body.correlationId.length).toBeGreaterThan(0);
   });
-  it("attaches grantedPermissions: [] when the permissions header is absent", async () => {
-    const app = buildAppWithHarness();
-
-    const { statusCode, body } = await injectAndParse(app, {
-      method: "GET",
-      url: TEST_HARNESS_ROUTE,
-      headers: {
+  it.each([
+    ["absent", undefined, []],
+    [
+      "present",
+      "nashir.products.read,nashir.products.manage",
+      ["nashir.products.read", "nashir.products.manage"]
+    ],
+    [
+      "trimmed and deduplicated",
+      " nashir.products.read , nashir.products.read , nashir.products.manage ",
+      ["nashir.products.read", "nashir.products.manage"]
+    ]
+  ])(
+    "attaches grantedPermissions when permissions header is %s",
+    async (_caseName, headerValue, expected) => {
+      const app = buildAppWithHarness();
+      const headers: Record<string, string> = {
         [WORKSPACE_ID_HEADER]: "workspace-123",
         [ACTOR_ID_HEADER]: "actor-456"
+      };
+
+      if (headerValue !== undefined) {
+        headers[GRANTED_PERMISSIONS_HEADER] = headerValue;
       }
-    });
 
-    expect(statusCode).toBe(200);
-    expect(body.grantedPermissions).toEqual([]);
-  });
+      const { statusCode, body } = await injectAndParse(app, {
+        method: "GET",
+        url: TEST_HARNESS_ROUTE,
+        headers
+      });
 
-  it("attaches parsed grantedPermissions when the permissions header is present", async () => {
-    const app = buildAppWithHarness();
-
-    const { statusCode, body } = await injectAndParse(app, {
-      method: "GET",
-      url: TEST_HARNESS_ROUTE,
-      headers: {
-        [WORKSPACE_ID_HEADER]: "workspace-123",
-        [ACTOR_ID_HEADER]: "actor-456",
-        [GRANTED_PERMISSIONS_HEADER]:
-          "nashir.products.read,nashir.products.manage"
-      }
-    });
-
-    expect(statusCode).toBe(200);
-    expect(body.grantedPermissions).toEqual([
-      "nashir.products.read",
-      "nashir.products.manage"
-    ]);
-  });
-
-  it("trims and deduplicates entries from the permissions header", async () => {
-    const app = buildAppWithHarness();
-
-    const { statusCode, body } = await injectAndParse(app, {
-      method: "GET",
-      url: TEST_HARNESS_ROUTE,
-      headers: {
-        [WORKSPACE_ID_HEADER]: "workspace-123",
-        [ACTOR_ID_HEADER]: "actor-456",
-        [GRANTED_PERMISSIONS_HEADER]:
-          " nashir.products.read , nashir.products.read , nashir.products.manage "
-      }
-    });
-
-    expect(statusCode).toBe(200);
-    expect(body.grantedPermissions).toEqual([
-      "nashir.products.read",
-      "nashir.products.manage"
-    ]);
-  });
+      expect(statusCode).toBe(200);
+      expect(body.grantedPermissions).toEqual(expected);
+    }
+  );
 });
