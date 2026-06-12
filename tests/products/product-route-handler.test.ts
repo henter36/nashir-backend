@@ -303,6 +303,17 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("BAD_REQUEST");
     });
 
+    it("returns 400 when cursor is invalid", async () => {
+      const app = buildHarnessApp();
+      const { response, body } = await harnessInject(app, {
+        method: "GET",
+        url: `${PRODUCTS_URL}?limit=10&cursor=not-a-valid-cursor`,
+        permissions: PERM_READ
+      });
+      expect(response.statusCode).toBe(400);
+      expect(body.code).toBe("BAD_REQUEST");
+    });
+
     it("returns 200 with empty list when no products exist in workspace", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
@@ -537,6 +548,38 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("VALIDATION_FAILED");
     });
 
+    it.each([
+      [
+        "invalid status",
+        { name: "Test", status: "published" },
+        "key-inv-status"
+      ],
+      [
+        "invalid stockStatus",
+        { name: "Test", stockStatus: "plenty" },
+        "key-inv-stock"
+      ],
+      ["negative price", { name: "Test", price: -1 }, "key-inv-price"],
+      [
+        "non-string nullable field (category)",
+        { name: "Test", category: 99 },
+        "key-inv-cat"
+      ]
+    ])("returns 422 when body has %s", async (_caseName, payload, idemKey) => {
+      const app = buildHarnessApp();
+      const { response, body } = await harnessInject(app, {
+        method: "POST",
+        url: PRODUCTS_URL,
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idemKey
+        },
+        payload: JSON.stringify(payload)
+      });
+      expect(response.statusCode).toBe(422);
+      expect(body.code).toBe("VALIDATION_FAILED");
+    });
+
     it("returns 201 with created product on first call", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
@@ -657,6 +700,17 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("NOT_FOUND");
     });
 
+    it("returns 404 when productId is not a valid UUID", async () => {
+      const app = buildHarnessApp();
+      const { response, body } = await harnessInject(app, {
+        method: "GET",
+        url: `${PRODUCTS_URL}/not-a-uuid`,
+        permissions: PERM_READ
+      });
+      expect(response.statusCode).toBe(404);
+      expect(body.code).toBe("NOT_FOUND");
+    });
+
     it("returns 404 when product belongs to a different workspace", async () => {
       const created = await productRepository.createProduct({
         workspaceId: "other-workspace",
@@ -741,11 +795,26 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("FORBIDDEN");
     });
 
+    it("returns 404 when productId is not a valid UUID", async () => {
+      const app = buildHarnessApp();
+      const { response, body } = await harnessInject(app, {
+        method: "PUT",
+        url: `${PRODUCTS_URL}/not-a-uuid`,
+        headers: {
+          "content-type": "application/json",
+          "if-match": "1"
+        },
+        payload: JSON.stringify({ name: "Updated" })
+      });
+      expect(response.statusCode).toBe(404);
+      expect(body.code).toBe("NOT_FOUND");
+    });
+
     it("returns 400 when neither If-Match nor X-Resource-Version is present", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: { "content-type": "application/json" },
         payload: JSON.stringify({ name: "Updated" })
       });
@@ -758,7 +827,7 @@ describeDb("Product Route Handlers", () => {
 
       const { response: r1, body: b1 } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "if-match": '"not-a-number"'
@@ -770,7 +839,7 @@ describeDb("Product Route Handlers", () => {
 
       const { response: r2, body: b2 } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "if-match": '"abc"'
@@ -786,7 +855,7 @@ describeDb("Product Route Handlers", () => {
 
       const { response: r1 } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "x-resource-version": "0"
@@ -797,7 +866,7 @@ describeDb("Product Route Handlers", () => {
 
       const { response: r2 } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "x-resource-version": "-1"
@@ -807,11 +876,26 @@ describeDb("Product Route Handlers", () => {
       expect(r2.statusCode).toBe(400);
     });
 
+    it("returns 400 when If-Match header value is empty", async () => {
+      const app = buildHarnessApp();
+      const { response, body } = await harnessInject(app, {
+        method: "PUT",
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
+        headers: {
+          "content-type": "application/json",
+          "if-match": ""
+        },
+        payload: JSON.stringify({ name: "Updated" })
+      });
+      expect(response.statusCode).toBe(400);
+      expect(body.code).toBe("BAD_REQUEST");
+    });
+
     it("returns 422 when body includes workspaceId", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "if-match": "1"
@@ -826,7 +910,7 @@ describeDb("Product Route Handlers", () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/some-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "if-match": "1"
@@ -836,6 +920,44 @@ describeDb("Product Route Handlers", () => {
       expect(response.statusCode).toBe(422);
       expect(body.code).toBe("VALIDATION_FAILED");
     });
+
+    it.each([
+      [
+        422,
+        "invalid status",
+        "VALIDATION_FAILED",
+        { name: "Valid", status: "published" }
+      ],
+      [
+        422,
+        "invalid stockStatus",
+        "VALIDATION_FAILED",
+        { name: "Valid", stockStatus: "plenty" }
+      ],
+      [
+        422,
+        "negative price",
+        "VALIDATION_FAILED",
+        { name: "Valid", price: -5 }
+      ],
+      [400, "no valid update fields", "BAD_REQUEST", {}]
+    ])(
+      "returns %i when body has %s",
+      async (expectedStatus, _caseName, expectedCode, payload) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "PUT",
+          url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
+          headers: {
+            "content-type": "application/json",
+            "if-match": "1"
+          },
+          payload: JSON.stringify(payload)
+        });
+        expect(response.statusCode).toBe(expectedStatus);
+        expect(body.code).toBe(expectedCode);
+      }
+    );
 
     it("returns 404 when product does not exist", async () => {
       const app = buildHarnessApp();

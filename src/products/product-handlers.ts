@@ -17,6 +17,7 @@ import type {
 import {
   PRODUCT_STATUSES,
   SORT_DIRECTIONS,
+  STOCK_STATUSES,
   type CreateProductInput,
   type ProductStatus,
   type SortDirection,
@@ -26,6 +27,13 @@ import {
 
 const PERMISSION_READ = "nashir.products.read";
 const PERMISSION_MANAGE = "nashir.products.manage";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
 
 function sendError(
   reply: FastifyReply,
@@ -43,6 +51,113 @@ function sendError(
     details
   });
   reply.code(statusCode).send(response.body);
+}
+
+function sendValidationFailed(
+  reply: FastifyReply,
+  message: string,
+  correlationId: string | undefined
+): void {
+  sendError(reply, 422, "VALIDATION_FAILED", message, correlationId);
+}
+
+type ValidateMode = "create" | "update";
+
+function validateProductPayload(
+  body: Record<string, unknown>,
+  mode: ValidateMode,
+  correlationId: string | undefined,
+  reply: FastifyReply
+): boolean {
+  if (mode === "create") {
+    if (
+      !body.name ||
+      typeof body.name !== "string" ||
+      body.name.trim().length === 0
+    ) {
+      sendValidationFailed(
+        reply,
+        "name is required and must be a non-empty string.",
+        correlationId
+      );
+      return false;
+    }
+  } else if ("name" in body) {
+    if (
+      typeof body.name !== "string" ||
+      (body.name as string).trim().length === 0
+    ) {
+      sendValidationFailed(
+        reply,
+        "name must be a non-empty string.",
+        correlationId
+      );
+      return false;
+    }
+  }
+
+  const stringOrNullFields = [
+    "category",
+    "sku",
+    "imageUrl",
+    "videoUrl",
+    "description"
+  ] as const;
+  for (const field of stringOrNullFields) {
+    if (
+      field in body &&
+      body[field] !== null &&
+      typeof body[field] !== "string"
+    ) {
+      sendValidationFailed(
+        reply,
+        `${field} must be a string or null.`,
+        correlationId
+      );
+      return false;
+    }
+  }
+
+  if (
+    "status" in body &&
+    !PRODUCT_STATUSES.includes(body.status as ProductStatus)
+  ) {
+    sendValidationFailed(
+      reply,
+      "status must be one of: draft, active, archived.",
+      correlationId
+    );
+    return false;
+  }
+
+  if (
+    "stockStatus" in body &&
+    !STOCK_STATUSES.includes(body.stockStatus as StockStatus)
+  ) {
+    sendValidationFailed(
+      reply,
+      "stockStatus must be one of: available, limited, out_of_stock, unknown.",
+      correlationId
+    );
+    return false;
+  }
+
+  if ("price" in body && body.price !== null) {
+    if (typeof body.price !== "number" || body.price < 0) {
+      sendValidationFailed(
+        reply,
+        "price must be a non-negative number or null.",
+        correlationId
+      );
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasUpdateFields(input: UpdateProductInput): boolean {
+  return Object.values(input).some((value) => value !== undefined);
 }
 
 function sortObjectKeys(value: unknown): unknown {
@@ -231,14 +346,32 @@ export function createListProductsHandler(deps: {
       return;
     }
 
-    const result = await deps.productRepository.listProducts({
-      workspaceId: ctx.workspaceId,
-      limit: limitNum,
-      cursor: q.cursor ?? null,
-      status: q.status as ProductStatus | undefined,
-      updatedAfter: q.updatedAfter,
-      sort: q.sort as SortDirection | undefined
-    });
+    let result;
+    try {
+      result = await deps.productRepository.listProducts({
+        workspaceId: ctx.workspaceId,
+        limit: limitNum,
+        cursor: q.cursor ?? null,
+        status: q.status as ProductStatus | undefined,
+        updatedAfter: q.updatedAfter,
+        sort: q.sort as SortDirection | undefined
+      });
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        err.message === "Invalid product list cursor"
+      ) {
+        sendError(
+          reply,
+          400,
+          "BAD_REQUEST",
+          "Invalid cursor.",
+          request.correlationId
+        );
+        return;
+      }
+      throw err;
+    }
 
     return {
       products: result.products,
@@ -321,14 +454,7 @@ export function createCreateProductHandler(deps: {
       return;
     }
 
-    if (!body.name || typeof body.name !== "string") {
-      sendError(
-        reply,
-        422,
-        "VALIDATION_FAILED",
-        "name is required and must be a non-empty string.",
-        request.correlationId
-      );
+    if (!validateProductPayload(body, "create", request.correlationId, reply)) {
       return;
     }
 
@@ -448,6 +574,17 @@ export function createGetProductHandler(deps: {
       return;
     }
 
+    if (!isUuid(request.params.productId)) {
+      sendError(
+        reply,
+        404,
+        "NOT_FOUND",
+        "Resource not found.",
+        request.correlationId
+      );
+      return;
+    }
+
     const product = await deps.productRepository.getProductById({
       workspaceId: ctx.workspaceId,
       productId: request.params.productId
@@ -507,6 +644,17 @@ export function createUpdateProductHandler(deps: {
       return;
     }
 
+    if (!isUuid(request.params.productId)) {
+      sendError(
+        reply,
+        404,
+        "NOT_FOUND",
+        "Resource not found.",
+        request.correlationId
+      );
+      return;
+    }
+
     const ifMatch = request.headers["if-match"];
     const xResourceVersion = request.headers["x-resource-version"];
 
@@ -514,6 +662,16 @@ export function createUpdateProductHandler(deps: {
 
     if (ifMatch !== undefined) {
       const raw = Array.isArray(ifMatch) ? ifMatch[0] : ifMatch;
+      if (typeof raw !== "string") {
+        sendError(
+          reply,
+          400,
+          "BAD_REQUEST",
+          "If-Match must be a positive integer or quoted positive integer.",
+          request.correlationId
+        );
+        return;
+      }
       const stripped = raw.replace(/^"(.*)"$/, "$1");
       const parsed = parseInt(stripped, 10);
       if (!Number.isSafeInteger(parsed) || parsed <= 0) {
@@ -567,7 +725,22 @@ export function createUpdateProductHandler(deps: {
       return;
     }
 
+    if (!validateProductPayload(body, "update", request.correlationId, reply)) {
+      return;
+    }
+
     const input = buildUpdateInput(body);
+
+    if (!hasUpdateFields(input)) {
+      sendError(
+        reply,
+        400,
+        "BAD_REQUEST",
+        "At least one product field is required for update.",
+        request.correlationId
+      );
+      return;
+    }
 
     const result = await deps.productRepository.updateProduct({
       workspaceId: ctx.workspaceId,
