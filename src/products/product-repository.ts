@@ -22,6 +22,10 @@ interface ProductListCursor {
   productId: string;
 }
 
+interface ProductListRow extends ProductRow {
+  cursor_updated_at: string;
+}
+
 function encodeCursor(cursor: ProductListCursor): string {
   return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
@@ -57,7 +61,7 @@ function normalizeLimit(limit: number): number {
 }
 
 function hasUpdateFields(input: UpdateProductInput): boolean {
-  return Object.keys(input).length > 0;
+  return Object.values(input).some((value) => value !== undefined);
 }
 
 export class ProductRepository {
@@ -150,9 +154,9 @@ export class ProductRepository {
 
     values.push(limit + 1);
 
-    const result = await this.db.query<ProductRow>(
+    const result = await this.db.query<ProductListRow>(
       `
-        SELECT *
+        SELECT *, updated_at::text AS cursor_updated_at
         FROM products
         WHERE ${whereClauses.join(" AND ")}
         ORDER BY updated_at DESC, product_id DESC
@@ -164,17 +168,17 @@ export class ProductRepository {
     const rows = result.rows.slice(0, limit);
     const products = rows.map(mapProductRow);
     const hasMore = result.rows.length > limit;
-    const lastProduct = products.at(-1);
+    const lastRow = rows.at(-1);
 
     return {
       products,
       count: products.length,
       hasMore,
       nextCursor:
-        hasMore && lastProduct
+        hasMore && lastRow
           ? encodeCursor({
-              updatedAt: lastProduct.updatedAt,
-              productId: lastProduct.productId
+              updatedAt: lastRow.cursor_updated_at,
+              productId: lastRow.product_id
             })
           : null
     };
@@ -198,39 +202,39 @@ export class ProductRepository {
       setClauses.push(`${column} = $${values.length}`);
     };
 
-    if ("name" in params.input) {
+    if (params.input.name !== undefined) {
       addSetClause("name", params.input.name);
     }
 
-    if ("category" in params.input) {
-      addSetClause("category", params.input.category ?? null);
+    if (params.input.category !== undefined) {
+      addSetClause("category", params.input.category);
     }
 
-    if ("price" in params.input) {
-      addSetClause("price", params.input.price ?? null);
+    if (params.input.price !== undefined) {
+      addSetClause("price", params.input.price);
     }
 
-    if ("sku" in params.input) {
-      addSetClause("sku", params.input.sku ?? null);
+    if (params.input.sku !== undefined) {
+      addSetClause("sku", params.input.sku);
     }
 
-    if ("stockStatus" in params.input) {
+    if (params.input.stockStatus !== undefined) {
       addSetClause("stock_status", params.input.stockStatus);
     }
 
-    if ("imageUrl" in params.input) {
-      addSetClause("image_url", params.input.imageUrl ?? null);
+    if (params.input.imageUrl !== undefined) {
+      addSetClause("image_url", params.input.imageUrl);
     }
 
-    if ("videoUrl" in params.input) {
-      addSetClause("video_url", params.input.videoUrl ?? null);
+    if (params.input.videoUrl !== undefined) {
+      addSetClause("video_url", params.input.videoUrl);
     }
 
-    if ("description" in params.input) {
-      addSetClause("description", params.input.description ?? null);
+    if (params.input.description !== undefined) {
+      addSetClause("description", params.input.description);
     }
 
-    if ("status" in params.input) {
+    if (params.input.status !== undefined) {
       addSetClause("status", params.input.status);
     }
 

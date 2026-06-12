@@ -22,7 +22,23 @@ function getTestDatabaseUrl(): string {
     );
   }
 
-  const databaseName = new URL(testDatabaseUrl).pathname.replace(/^\//u, "");
+  let databaseName = "";
+
+  try {
+    if (
+      testDatabaseUrl.startsWith("postgres://") ||
+      testDatabaseUrl.startsWith("postgresql://")
+    ) {
+      databaseName = new URL(testDatabaseUrl).pathname.replace(/^\//u, "");
+    } else {
+      const match = testDatabaseUrl.match(/(?:^|\s)dbname\s*=\s*([^\s]+)/u);
+      if (match?.[1]) {
+        databaseName = match[1].replace(/^['"]|['"]$/gu, "");
+      }
+    }
+  } catch {
+    databaseName = "";
+  }
 
   if (!databaseName || !databaseName.includes("test")) {
     throw new Error(
