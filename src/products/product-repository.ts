@@ -6,9 +6,15 @@ import type {
   ListProductsInput,
   ListProductsResult,
   Product,
+  SortDirection,
   UpdateProductInput,
   UpdateProductResult
 } from "./product-types.js";
+
+const SORT_ORDER_MAP: Record<SortDirection, string> = {
+  "updatedAt:desc": "updated_at DESC, product_id DESC",
+  "updatedAt:asc": "updated_at ASC, product_id ASC"
+};
 
 export interface PgQueryable {
   query<T extends QueryResultRow = QueryResultRow>(
@@ -144,11 +150,15 @@ export class ProductRepository {
       whereClauses.push(`updated_at > $${values.length}::timestamptz`);
     }
 
+    const sortDirection = params.sort ?? "updatedAt:desc";
+    const sortOrder = SORT_ORDER_MAP[sortDirection];
+
     if (params.cursor) {
       const cursor = decodeCursor(params.cursor);
       values.push(cursor.updatedAt, cursor.productId);
+      const comparisonOp = sortDirection === "updatedAt:asc" ? ">" : "<";
       whereClauses.push(
-        `(updated_at, product_id) < ($${values.length - 1}::timestamptz, $${values.length})`
+        `(updated_at, product_id) ${comparisonOp} ($${values.length - 1}::timestamptz, $${values.length})`
       );
     }
 
@@ -159,7 +169,7 @@ export class ProductRepository {
         SELECT *, updated_at::text AS cursor_updated_at
         FROM products
         WHERE ${whereClauses.join(" AND ")}
-        ORDER BY updated_at DESC, product_id DESC
+        ORDER BY ${sortOrder}
         LIMIT $${values.length};
       `,
       values
