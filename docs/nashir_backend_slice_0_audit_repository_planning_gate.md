@@ -1,23 +1,35 @@
-Nashir Backend Slice 0 — AuditRepository Planning Gate
-1. Gate Name
+# Nashir Backend Slice 0 — AuditRepository Planning Gate
+
+## 1. Gate Name
+
 Backend Slice 0 AuditRepository Planning Gate
-2. Gate Type
+
+## 2. Gate Type
+
 Planning gate.
+
 This gate plans the future AuditRepository implementation after the Product Route Handler implementation and acceptance review were completed.
+
 This gate does not authorize implementation.
-3. Inputs
-3.1 Repository
-* Repository: henter36/nashir-backend
-* Base branch: main
-3.2 Completed Prior Gates / PRs
-ItemStatus
-Product persistence infrastructureCompleted
-ProductRepository implementationCompleted
-IdempotencyRepository implementationCompleted
-Request Context Permissions implementationCompleted
-Product Route Handler implementationCompleted
-Product Route Handler Acceptance GateCompleted
-Product Route Handler Acceptance Review GateCompleted
+
+## 3. Inputs
+
+### 3.1 Repository
+
+- Repository: `henter36/nashir-backend`
+- Base branch: `main`
+
+### 3.2 Completed Prior Gates / PRs
+
+| Item | Status |
+| :--- | :--- |
+| Product persistence infrastructure | Completed |
+| ProductRepository implementation | Completed |
+| IdempotencyRepository implementation | Completed |
+| Request Context Permissions implementation | Completed |
+| Product Route Handler implementation | Completed |
+| Product Route Handler Acceptance Gate | Completed |
+| Product Route Handler Acceptance Review Gate | Completed |
 3.3 Current Known Gap
 The Product Route Handler implementation intentionally did not implement:
 * AuditRepository
@@ -68,14 +80,15 @@ This planning gate does not authorize:
 Decision required:
 Define the exact AuditRepository input contract.
 Minimum proposed fields:
-FieldPurpose
-workspaceIdWorkspace boundary
-actorIdActor performing the action
-actionAudited action name
-resourceTypeResource category, e.g. product
-resourceIdResource identifier
-correlationIdRequest correlation identifier
-metadataAdditional structured event data
+| Field | Purpose |
+| :--- | :--- |
+| `workspaceId` | Workspace boundary |
+| `actorId` | Actor performing the action |
+| `action` | Audited action name |
+| `resourceType` | Resource category, e.g. `product` |
+| `resourceId` | Resource identifier |
+| `correlationId` | Request correlation identifier |
+| `metadata` | Additional structured event data |
 Proposed action names:
 Product OperationProposed Audit Action
 Product createdproduct.created
@@ -85,10 +98,11 @@ This is a proposal, not yet an implementation decision.
 Decision required:
 Choose whether audit writes must be in the same transaction as product mutation.
 Options:
-OptionMeaningRisk
-Same transactionProduct change and audit write commit/fail togetherStrong consistency, but audit failures block product mutation
-Separate transactionProduct change can succeed even if audit write failsPossible audit gap
-Outbox-style deferred auditProduct change records audit intent for later processingMore robust, but larger scope
+| Option | Meaning | Risk |
+| :--- | :--- | :--- |
+| Same transaction | Product change and audit write commit/fail together | Strong consistency, but audit failures block product mutation |
+| Separate transaction | Product change can succeed even if audit write fails | Possible audit gap |
+| Outbox-style deferred audit | Product change records audit intent for later processing | More robust, but larger scope |
 Recommended for V1:
 Same transaction for product create/update audit events.
 Reason:
@@ -155,15 +169,16 @@ The future implementation gate should continue to block:
 * CI workflow changes.
 * UI work.
 11. Risks
-RiskStatusNotes
-Product mutations without audit persistenceOpenMain driver for this planning gate
-Audit write failure behavior unclearOpenMust be decided before implementation
-Product and audit transaction boundary unclearOpenMust be decided before implementation
-Idempotency replay causing duplicate audit eventsOpenMust be explicitly prevented
-Failed idempotency retry policy mixed into audit sliceOpenShould remain separate unless authorized
-Audit metadata overcollectionOpenMetadata should be minimal and non-sensitive
-OpenAPI driftControlledOpenAPI changes are out of scope
-Scope creep into Auth0 mappingControlledAuth0 mapping remains separate
+| Risk | Status | Notes |
+| :--- | :--- | :--- |
+| Product mutations without audit persistence | Open | Main driver for this planning gate |
+| Audit write failure behavior unclear | Open | Must be decided before implementation |
+| Product and audit transaction boundary unclear | Open | Must be decided before implementation |
+| Idempotency replay causing duplicate audit events | Open | Must be explicitly prevented |
+| Failed idempotency retry policy mixed into audit slice | Open | Should remain separate unless authorized |
+| Audit metadata overcollection | Open | Metadata should be minimal and non-sensitive |
+| OpenAPI drift | Controlled | OpenAPI changes are out of scope |
+| Scope creep into Auth0 mapping | Controlled | Auth0 mapping remains separate |
 12. Legal / Compliance Review
 Audit events may contain operationally sensitive data.
 Planning constraints:
