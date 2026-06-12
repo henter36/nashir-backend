@@ -148,7 +148,7 @@ function resolveContextAndPermission(
     grantedPermissions: ctx.grantedPermissions ?? [],
     requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
   });
-  if (decision.ok !== true) {
+  if (decision.ok === false) {
     sendError(
       reply,
       decision.statusCode,
@@ -163,16 +163,18 @@ function resolveContextAndPermission(
 
 type ValidateMode = "create" | "update";
 
-type ValidateOk<T extends CreateProductInput | UpdateProductInput> = {
-  ok: true;
-  input: T;
-};
 type ValidateFail = {
   ok: false;
   statusCode: 400 | 422;
   code: "BAD_REQUEST" | "VALIDATION_FAILED";
   message: string;
 };
+type CreateValidationResult =
+  | { ok: true; input: CreateProductInput }
+  | ValidateFail;
+type UpdateValidationResult =
+  | { ok: true; input: UpdateProductInput }
+  | ValidateFail;
 
 function validationFailed(message: string): ValidateFail {
   return {
@@ -265,21 +267,10 @@ function validateUpdateHasFields(
   };
 }
 
-function validateProductBody(
-  body: Record<string, unknown>,
-  mode: "create"
-): ValidateOk<CreateProductInput> | ValidateFail;
-function validateProductBody(
-  body: Record<string, unknown>,
-  mode: "update"
-): ValidateOk<UpdateProductInput> | ValidateFail;
-function validateProductBody(
+function validateSharedProductFields(
   body: Record<string, unknown>,
   mode: ValidateMode
-):
-  | ValidateOk<CreateProductInput>
-  | ValidateOk<UpdateProductInput>
-  | ValidateFail {
+): ValidateFail | null {
   let failure = validateName(body, mode);
   if (failure !== null) return failure;
 
@@ -295,14 +286,29 @@ function validateProductBody(
   failure = validatePrice(body);
   if (failure !== null) return failure;
 
-  if (mode === "update") {
-    const input = buildUpdateInput(body);
-    failure = validateUpdateHasFields(input);
-    if (failure !== null) return failure;
-    return { ok: true, input };
-  }
+  return null;
+}
+
+function validateCreateProductBody(
+  body: Record<string, unknown>
+): CreateValidationResult {
+  const failure = validateSharedProductFields(body, "create");
+  if (failure !== null) return failure;
 
   return { ok: true, input: buildCreateInput(body) };
+}
+
+function validateUpdateProductBody(
+  body: Record<string, unknown>
+): UpdateValidationResult {
+  const failure = validateSharedProductFields(body, "update");
+  if (failure !== null) return failure;
+
+  const input = buildUpdateInput(body);
+  const updateFailure = validateUpdateHasFields(input);
+  if (updateFailure !== null) return updateFailure;
+
+  return { ok: true, input };
 }
 
 function buildCreateInput(body: Record<string, unknown>): CreateProductInput {
@@ -383,7 +389,7 @@ export function createListProductsHandler(deps: {
     reply: FastifyReply
   ): Promise<ProductListResponse | void> {
     const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
-    if (check.ok !== true) {
+    if (check.ok === false) {
       return;
     }
     const { ctx } = check;
@@ -484,7 +490,7 @@ export function createCreateProductHandler(deps: {
       reply,
       PERMISSION_MANAGE
     );
-    if (check.ok !== true) {
+    if (check.ok === false) {
       return;
     }
     const { ctx } = check;
@@ -511,8 +517,8 @@ export function createCreateProductHandler(deps: {
       return;
     }
 
-    const validation = validateProductBody(body, "create");
-    if (validation.ok !== true) {
+    const validation = validateCreateProductBody(body);
+    if (validation.ok === false) {
       sendError(
         reply,
         validation.statusCode,
@@ -559,7 +565,8 @@ export function createCreateProductHandler(deps: {
         return;
       }
       if (record.responseStatusCode === 201) {
-        return reply.code(201).send(record.responseBody) as unknown as void;
+        reply.code(201).send(record.responseBody);
+        return;
       }
       sendError(
         reply,
@@ -592,7 +599,8 @@ export function createCreateProductHandler(deps: {
       resourceId: product.productId
     });
 
-    return reply.code(201).send(productResponse) as unknown as void;
+    reply.code(201).send(productResponse);
+    return;
   };
 }
 
@@ -604,12 +612,12 @@ export function createGetProductHandler(deps: {
     reply: FastifyReply
   ): Promise<ProductResponse | void> {
     const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
-    if (check.ok !== true) {
+    if (check.ok === false) {
       return;
     }
     const { ctx } = check;
 
-    if (!isUuid(request.params.productId)) {
+    if (isUuid(request.params.productId) === false) {
       sendNotFound(reply, request.correlationId);
       return;
     }
@@ -619,7 +627,7 @@ export function createGetProductHandler(deps: {
       productId: request.params.productId
     });
 
-    if (!product) {
+    if (product === null) {
       sendNotFound(reply, request.correlationId);
       return;
     }
@@ -643,12 +651,12 @@ export function createUpdateProductHandler(deps: {
       reply,
       PERMISSION_MANAGE
     );
-    if (check.ok !== true) {
+    if (check.ok === false) {
       return;
     }
     const { ctx } = check;
 
-    if (!isUuid(request.params.productId)) {
+    if (isUuid(request.params.productId) === false) {
       sendNotFound(reply, request.correlationId);
       return;
     }
@@ -709,8 +717,8 @@ export function createUpdateProductHandler(deps: {
       return;
     }
 
-    const validation = validateProductBody(body, "update");
-    if (validation.ok !== true) {
+    const validation = validateUpdateProductBody(body);
+    if (validation.ok === false) {
       sendError(
         reply,
         validation.statusCode,
