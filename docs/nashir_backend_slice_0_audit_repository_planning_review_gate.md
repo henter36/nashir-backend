@@ -229,6 +229,7 @@ Proposed allowlist:
 | `src/audit/audit-types.ts` | Audit input/result types |
 | `tests/audit/audit-repository.test.ts` | AuditRepository tests |
 | `src/products/product-handlers.ts` | Wire audit writes into product create/update only |
+| `src/products/product-repository.ts` | Allow optional transaction client support for product create/update if required by the selected transaction boundary |
 | `tests/products/product-route-handler.test.ts` | Add audit integration coverage |
 
 This is a proposed allowlist for the next authorization gate. It is not implementation authorization by this document.
@@ -328,7 +329,7 @@ git status -sb
 git log --oneline -5
 grep -R "AuditRepository" -n src tests docs || true
 grep -R "audit_events" -n src tests migrations docs || true
-sed -n '90,125p' docs/nashir_backend_slice_0_audit_repository_planning_gate.md
+sed -n '/### 8.1 Audit Event Shape/,/### 8.2 Transaction Boundary/p' docs/nashir_backend_slice_0_audit_repository_planning_gate.md
 ```
 
 ## 14. Output
