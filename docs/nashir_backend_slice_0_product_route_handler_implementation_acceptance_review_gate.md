@@ -10,9 +10,10 @@ This gate does not authorize backend implementation, route changes, database mig
 * Repository: henter36/nashir-backend
 * Base branch: main
 3.2 Relevant Merged Pull Requests
-Pull RequestPurposeMerge Commit
-#113Product Route Handler implementation7d8e66b54a5abb3e07e83890abfd36fc27c00d5d
-#114Complete Product Route Handler Acceptance Gate after placeholder correctionb936220a950f7494395a0da0db47ffc40c23652a
+| Pull Request | Purpose | Merge Commit |
+| :--- | :--- | :--- |
+| #113 | Product Route Handler implementation | 7d8e66b54a5abb3e07e83890abfd36fc27c00d5d |
+| #114 | Complete Product Route Handler Acceptance Gate after placeholder correction | b936220a950f7494395a0da0db47ffc40c23652a |
 3.3 Reviewed Acceptance Gate
 Reviewed file:
 docs/nashir_backend_slice_0_product_route_handler_implementation_acceptance_gate.md
@@ -62,15 +63,16 @@ The acceptance gate correctly leaves the following out of scope:
 Accepted conclusion:
 These are not completed by Product Route Handler implementation and must not be claimed as done.
 6. Risk Review
-RiskStatusReview Decision
-Placeholder acceptance gate remained on mainMitigatedCorrected by PR #114
-Product route handler implementation lacked acceptance recordMitigatedAcceptance gate now exists
-New runtime work hidden in acceptance correctionNo evidencePR #114 is documentation-only
-Audit assumed completeOpenRequires separate gate
-Auth0 permission mapping assumed completeOpenRequires separate gate
-Production resolver assumed completeOpenRequires separate gate
-Failed idempotency retry policy unresolvedOpenRequires amendment gate if selected
-Direct push to main repeatsOpen process riskRequires local hook and GitHub branch protection
+| Risk | Status | Review Decision |
+| :--- | :--- | :--- |
+| Placeholder acceptance gate remained on main | Mitigated | Corrected by PR #114 |
+| Product route handler implementation lacked acceptance record | Mitigated | Acceptance gate now exists |
+| New runtime work hidden in acceptance correction | No evidence | PR #114 is documentation-only |
+| Audit assumed complete | Open | Requires separate gate |
+| Auth0 permission mapping assumed complete | Open | Requires separate gate |
+| Production resolver assumed complete | Open | Requires separate gate |
+| Failed idempotency retry policy unresolved | Open | Requires amendment gate if selected |
+| Direct push to main repeats | Open process risk | Requires local hook and GitHub branch protection |
 7. Process Control Review
 7.1 Direct Push Prevention
 Required project rule from this point forward:
