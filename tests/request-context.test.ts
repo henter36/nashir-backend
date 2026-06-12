@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTOR_ID_HEADER,
+  GRANTED_PERMISSIONS_HEADER,
   WORKSPACE_ID_HEADER,
   requireRequestContext,
   resolveRequestContextFromHeaders,
@@ -19,7 +20,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -31,7 +36,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -43,7 +52,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -205,7 +218,166 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-first", actorId: "actor-first" }
+      context: {
+        workspaceId: "workspace-first",
+        actorId: "actor-first",
+        grantedPermissions: []
+      }
+    });
+  });
+  it("returns grantedPermissions: [] when the permissions header is absent", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
+    });
+  });
+
+  it("returns grantedPermissions: [] when the permissions header is blank", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]: ""
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
+    });
+  });
+
+  it("returns grantedPermissions: [] when the permissions header is whitespace-only", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]: "   "
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
+    });
+  });
+
+  it("returns a single permission value", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]: "nashir.products.read"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read"]
+      }
+    });
+  });
+
+  it("returns multiple permissions from a comma-separated header", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]:
+        "nashir.products.read,nashir.products.manage"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read", "nashir.products.manage"]
+      }
+    });
+  });
+
+  it("trims whitespace from each permission entry", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]:
+        " nashir.products.read , nashir.products.manage "
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read", "nashir.products.manage"]
+      }
+    });
+  });
+
+  it("filters out empty permission entries", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]:
+        "nashir.products.read,, ,nashir.products.manage"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read", "nashir.products.manage"]
+      }
+    });
+  });
+
+  it("deduplicates repeated permission values", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      [GRANTED_PERMISSIONS_HEADER]:
+        "nashir.products.read,nashir.products.read,nashir.products.manage"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read", "nashir.products.manage"]
+      }
+    });
+  });
+
+  it("reads x-nashir-granted-permissions case-insensitively", () => {
+    const result = resolveRequestContextFromHeaders({
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456",
+      "X-Nashir-Granted-Permissions": "nashir.products.read"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: ["nashir.products.read"]
+      }
     });
   });
 });
@@ -219,7 +391,8 @@ describe("requireRequestContext", () => {
 
     expect(requireRequestContext(result)).toEqual({
       workspaceId: "workspace-123",
-      actorId: "actor-456"
+      actorId: "actor-456",
+      grantedPermissions: []
     });
   });
 

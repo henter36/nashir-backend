@@ -5,6 +5,7 @@ import { buildApp } from "../src/app.js";
 import {
   ACTOR_ID_HEADER,
   CORRELATION_ID_HEADER,
+  GRANTED_PERMISSIONS_HEADER,
   WORKSPACE_ID_HEADER
 } from "../src/request-context.js";
 
@@ -40,6 +41,7 @@ async function harnessHandler(request: FastifyRequest) {
   return {
     workspaceId: request.requestContext?.workspaceId ?? null,
     actorId: request.requestContext?.actorId ?? null,
+    grantedPermissions: request.requestContext?.grantedPermissions ?? null,
     correlationId: request.correlationId ?? null
   };
 }
@@ -502,5 +504,62 @@ describe("request-context plumbing on a gated non-health harness route", () => {
     expect(statusCode).toBe(200);
     expect(typeof body.correlationId).toBe("string");
     expect(body.correlationId.length).toBeGreaterThan(0);
+  });
+  it("attaches grantedPermissions: [] when the permissions header is absent", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: TEST_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      }
+    });
+
+    expect(statusCode).toBe(200);
+    expect(body.grantedPermissions).toEqual([]);
+  });
+
+  it("attaches parsed grantedPermissions when the permissions header is present", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: TEST_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [GRANTED_PERMISSIONS_HEADER]:
+          "nashir.products.read,nashir.products.manage"
+      }
+    });
+
+    expect(statusCode).toBe(200);
+    expect(body.grantedPermissions).toEqual([
+      "nashir.products.read",
+      "nashir.products.manage"
+    ]);
+  });
+
+  it("trims and deduplicates entries from the permissions header", async () => {
+    const app = buildAppWithHarness();
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: TEST_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [GRANTED_PERMISSIONS_HEADER]:
+          " nashir.products.read , nashir.products.read , nashir.products.manage "
+      }
+    });
+
+    expect(statusCode).toBe(200);
+    expect(body.grantedPermissions).toEqual([
+      "nashir.products.read",
+      "nashir.products.manage"
+    ]);
   });
 });
