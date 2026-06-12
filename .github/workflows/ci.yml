@@ -79,8 +79,10 @@ jobs:
         working-directory: nashir-backend
         run: pnpm test
 
-      - name: Test DB migrations
+      - name: Test DB migrations and product repository
         working-directory: nashir-backend
         env:
           TEST_DATABASE_URL: postgresql://nashir@127.0.0.1:5432/nashir_test
-        run: pnpm run test:db
+        run: |
+          pnpm run test:db
+          pnpm exec vitest run tests/products/product-repository.test.ts --pool forks --maxWorkers=1
