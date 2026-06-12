@@ -30,9 +30,31 @@ const PERMISSION_MANAGE = "nashir.products.manage";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PRODUCT_STATUS_SET = new Set<string>(PRODUCT_STATUSES);
+const STOCK_STATUS_SET = new Set<string>(STOCK_STATUSES);
+const SORT_DIRECTION_SET = new Set<string>(SORT_DIRECTIONS);
+const STRING_OR_NULL_FIELDS = [
+  "category",
+  "sku",
+  "imageUrl",
+  "videoUrl",
+  "description"
+] as const;
 
 function isUuid(value: string): boolean {
   return UUID_RE.test(value);
+}
+
+function isProductStatus(value: unknown): value is ProductStatus {
+  return typeof value === "string" && PRODUCT_STATUS_SET.has(value);
+}
+
+function isStockStatus(value: unknown): value is StockStatus {
+  return typeof value === "string" && STOCK_STATUS_SET.has(value);
+}
+
+function isSortDirection(value: unknown): value is SortDirection {
+  return typeof value === "string" && SORT_DIRECTION_SET.has(value);
 }
 
 function parsePositiveInteger(value: unknown): number | null {
@@ -44,13 +66,21 @@ function parsePositiveInteger(value: unknown): number | null {
 }
 
 function isInvalidCursorError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = "code" in err ? (err as { code?: unknown }).code : undefined;
   return (
-    err instanceof Error &&
-    (err.message === "Invalid product list cursor" ||
-      ("code" in err &&
-        ((err as { code?: unknown }).code === "22007" ||
-          (err as { code?: unknown }).code === "22P02")))
+    err.message === "Invalid product list cursor" ||
+    code === "22007" ||
+    code === "22P02"
   );
+}
+
+function firstHeaderValue(
+  value: string | readonly string[] | undefined
+): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
 }
 
 function sendError(
@@ -103,7 +133,7 @@ function resolveContextAndPermission(
   requiredPermission: string
 ): { ok: true; ctx: ResolvedCtx } | { ok: false } {
   const ctx = request.requestContext;
-  if (!ctx) {
+  if (ctx === undefined) {
     sendError(
       reply,
       500,
@@ -118,7 +148,7 @@ function resolveContextAndPermission(
     grantedPermissions: ctx.grantedPermissions ?? [],
     requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
   });
-  if (!decision.ok) {
+  if (decision.ok !== true) {
     sendError(
       reply,
       decision.statusCode,
@@ -133,7 +163,10 @@ function resolveContextAndPermission(
 
 type ValidateMode = "create" | "update";
 
-type ValidateOk = { ok: true; input: CreateProductInput | UpdateProductInput };
+type ValidateOk<T extends CreateProductInput | UpdateProductInput> = {
+  ok: true;
+  input: T;
+};
 type ValidateFail = {
   ok: false;
   statusCode: 400 | 422;
@@ -141,43 +174,41 @@ type ValidateFail = {
   message: string;
 };
 
-function validateProductBody(
-  body: Record<string, unknown>,
-  mode: ValidateMode
-): ValidateOk | ValidateFail {
-  const validationFailed = (message: string): ValidateFail => ({
+function validationFailed(message: string): ValidateFail {
+  return {
     ok: false,
     statusCode: 422,
     code: "VALIDATION_FAILED",
     message
-  });
+  };
+}
 
+function validateName(
+  body: Record<string, unknown>,
+  mode: ValidateMode
+): ValidateFail | null {
+  const name = body.name;
   if (mode === "create") {
-    if (
-      !body.name ||
-      typeof body.name !== "string" ||
-      body.name.trim().length === 0
-    ) {
+    if (typeof name !== "string" || name.trim().length === 0) {
       return validationFailed(
         "name is required and must be a non-empty string."
       );
     }
-  } else if ("name" in body) {
-    if (
-      typeof body.name !== "string" ||
-      (body.name as string).trim().length === 0
-    ) {
-      return validationFailed("name must be a non-empty string.");
-    }
+    return null;
   }
+  if (
+    "name" in body &&
+    (typeof name !== "string" || name.trim().length === 0)
+  ) {
+    return validationFailed("name must be a non-empty string.");
+  }
+  return null;
+}
 
-  for (const field of [
-    "category",
-    "sku",
-    "imageUrl",
-    "videoUrl",
-    "description"
-  ] as const) {
+function validateStringOrNullFields(
+  body: Record<string, unknown>
+): ValidateFail | null {
+  for (const field of STRING_OR_NULL_FIELDS) {
     if (
       field in body &&
       body[field] !== null &&
@@ -186,43 +217,88 @@ function validateProductBody(
       return validationFailed(`${field} must be a string or null.`);
     }
   }
+  return null;
+}
 
-  if (
-    "status" in body &&
-    !PRODUCT_STATUSES.includes(body.status as ProductStatus)
-  ) {
+function validateProductStatus(
+  body: Record<string, unknown>
+): ValidateFail | null {
+  if ("status" in body && isProductStatus(body.status) !== true) {
     return validationFailed("status must be one of: draft, active, archived.");
   }
+  return null;
+}
 
-  if (
-    "stockStatus" in body &&
-    !STOCK_STATUSES.includes(body.stockStatus as StockStatus)
-  ) {
+function validateStockStatus(
+  body: Record<string, unknown>
+): ValidateFail | null {
+  if ("stockStatus" in body && isStockStatus(body.stockStatus) !== true) {
     return validationFailed(
       "stockStatus must be one of: available, limited, out_of_stock, unknown."
     );
   }
+  return null;
+}
 
-  if ("price" in body && body.price !== null) {
-    if (
-      typeof body.price !== "number" ||
-      !Number.isFinite(body.price) ||
-      body.price < 0
-    ) {
-      return validationFailed("price must be a non-negative number or null.");
-    }
+function validatePrice(body: Record<string, unknown>): ValidateFail | null {
+  if (
+    "price" in body &&
+    body.price !== null &&
+    (typeof body.price !== "number" ||
+      Number.isFinite(body.price) !== true ||
+      body.price < 0)
+  ) {
+    return validationFailed("price must be a non-negative number or null.");
   }
+  return null;
+}
+
+function validateUpdateHasFields(
+  input: UpdateProductInput
+): ValidateFail | null {
+  if (hasUpdateFields(input)) return null;
+  return {
+    ok: false,
+    statusCode: 400,
+    code: "BAD_REQUEST",
+    message: "At least one product field is required for update."
+  };
+}
+
+function validateProductBody(
+  body: Record<string, unknown>,
+  mode: "create"
+): ValidateOk<CreateProductInput> | ValidateFail;
+function validateProductBody(
+  body: Record<string, unknown>,
+  mode: "update"
+): ValidateOk<UpdateProductInput> | ValidateFail;
+function validateProductBody(
+  body: Record<string, unknown>,
+  mode: ValidateMode
+):
+  | ValidateOk<CreateProductInput>
+  | ValidateOk<UpdateProductInput>
+  | ValidateFail {
+  let failure = validateName(body, mode);
+  if (failure !== null) return failure;
+
+  failure = validateStringOrNullFields(body);
+  if (failure !== null) return failure;
+
+  failure = validateProductStatus(body);
+  if (failure !== null) return failure;
+
+  failure = validateStockStatus(body);
+  if (failure !== null) return failure;
+
+  failure = validatePrice(body);
+  if (failure !== null) return failure;
 
   if (mode === "update") {
     const input = buildUpdateInput(body);
-    if (!hasUpdateFields(input)) {
-      return {
-        ok: false,
-        statusCode: 400,
-        code: "BAD_REQUEST",
-        message: "At least one product field is required for update."
-      };
-    }
+    failure = validateUpdateHasFields(input);
+    if (failure !== null) return failure;
     return { ok: true, input };
   }
 
@@ -235,13 +311,12 @@ function buildCreateInput(body: Record<string, unknown>): CreateProductInput {
     category: "category" in body ? (body.category as string | null) : undefined,
     price: "price" in body ? (body.price as number | null) : undefined,
     sku: "sku" in body ? (body.sku as string | null) : undefined,
-    stockStatus:
-      "stockStatus" in body ? (body.stockStatus as StockStatus) : undefined,
+    stockStatus: isStockStatus(body.stockStatus) ? body.stockStatus : undefined,
     imageUrl: "imageUrl" in body ? (body.imageUrl as string | null) : undefined,
     videoUrl: "videoUrl" in body ? (body.videoUrl as string | null) : undefined,
     description:
       "description" in body ? (body.description as string | null) : undefined,
-    status: "status" in body ? (body.status as ProductStatus) : undefined
+    status: isProductStatus(body.status) ? body.status : undefined
   };
 }
 
@@ -251,13 +326,12 @@ function buildUpdateInput(body: Record<string, unknown>): UpdateProductInput {
   if ("category" in body) input.category = body.category as string | null;
   if ("price" in body) input.price = body.price as number | null;
   if ("sku" in body) input.sku = body.sku as string | null;
-  if ("stockStatus" in body)
-    input.stockStatus = body.stockStatus as StockStatus;
+  if (isStockStatus(body.stockStatus)) input.stockStatus = body.stockStatus;
   if ("imageUrl" in body) input.imageUrl = body.imageUrl as string | null;
   if ("videoUrl" in body) input.videoUrl = body.videoUrl as string | null;
   if ("description" in body)
     input.description = body.description as string | null;
-  if ("status" in body) input.status = body.status as ProductStatus;
+  if (isProductStatus(body.status)) input.status = body.status;
   return input;
 }
 
@@ -268,8 +342,8 @@ function hasUpdateFields(input: UpdateProductInput): boolean {
 function sortObjectKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortObjectKeys);
   if (value !== null && typeof value === "object") {
-    return Object.keys(value as object)
-      .sort()
+    return Object.keys(value as Record<string, unknown>)
+      .sort((a, b) => a.localeCompare(b))
       .reduce(
         (acc, key) => {
           acc[key] = sortObjectKeys((value as Record<string, unknown>)[key]);
@@ -309,10 +383,14 @@ export function createListProductsHandler(deps: {
     reply: FastifyReply
   ): Promise<ProductListResponse | void> {
     const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
-    if (!check.ok) return;
+    if (check.ok !== true) {
+      return;
+    }
     const { ctx } = check;
 
     const q = request.query;
+    const status = q.status;
+    const sort = q.sort;
 
     if (q.limit === undefined || q.limit === "") {
       sendBadRequest(reply, "limit is required.", request.correlationId);
@@ -335,10 +413,7 @@ export function createListProductsHandler(deps: {
       );
       return;
     }
-    if (
-      q.status !== undefined &&
-      !PRODUCT_STATUSES.includes(q.status as ProductStatus)
-    ) {
+    if (status !== undefined && isProductStatus(status) !== true) {
       sendBadRequest(
         reply,
         "status must be one of: draft, active, archived.",
@@ -357,10 +432,7 @@ export function createListProductsHandler(deps: {
         return;
       }
     }
-    if (
-      q.sort !== undefined &&
-      !SORT_DIRECTIONS.includes(q.sort as SortDirection)
-    ) {
+    if (sort !== undefined && isSortDirection(sort) !== true) {
       sendBadRequest(
         reply,
         "sort must be one of: updatedAt:desc, updatedAt:asc.",
@@ -375,9 +447,9 @@ export function createListProductsHandler(deps: {
         workspaceId: ctx.workspaceId,
         limit: limitNum,
         cursor: q.cursor ?? null,
-        status: q.status as ProductStatus | undefined,
+        status,
         updatedAfter: q.updatedAfter,
-        sort: q.sort as SortDirection | undefined
+        sort
       });
     } catch (err) {
       if (isInvalidCursorError(err)) {
@@ -412,16 +484,12 @@ export function createCreateProductHandler(deps: {
       reply,
       PERMISSION_MANAGE
     );
-    if (!check.ok) return;
+    if (check.ok !== true) {
+      return;
+    }
     const { ctx } = check;
 
-    const rawKey = request.headers["idempotency-key"];
-    const idempotencyKey =
-      typeof rawKey === "string"
-        ? rawKey
-        : Array.isArray(rawKey)
-          ? rawKey[0]
-          : undefined;
+    const idempotencyKey = firstHeaderValue(request.headers["idempotency-key"]);
 
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       sendBadRequest(
@@ -444,7 +512,7 @@ export function createCreateProductHandler(deps: {
     }
 
     const validation = validateProductBody(body, "create");
-    if (!validation.ok) {
+    if (validation.ok !== true) {
       sendError(
         reply,
         validation.statusCode,
@@ -507,7 +575,7 @@ export function createCreateProductHandler(deps: {
     try {
       product = await deps.productRepository.createProduct({
         workspaceId: ctx.workspaceId,
-        input: validation.input as CreateProductInput
+        input: validation.input
       });
     } catch (err) {
       await deps.idempotencyRepository
@@ -536,7 +604,9 @@ export function createGetProductHandler(deps: {
     reply: FastifyReply
   ): Promise<ProductResponse | void> {
     const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
-    if (!check.ok) return;
+    if (check.ok !== true) {
+      return;
+    }
     const { ctx } = check;
 
     if (!isUuid(request.params.productId)) {
@@ -573,7 +643,9 @@ export function createUpdateProductHandler(deps: {
       reply,
       PERMISSION_MANAGE
     );
-    if (!check.ok) return;
+    if (check.ok !== true) {
+      return;
+    }
     const { ctx } = check;
 
     if (!isUuid(request.params.productId)) {
@@ -606,9 +678,7 @@ export function createUpdateProductHandler(deps: {
       }
       expectedVersion = parsed;
     } else if (xResourceVersion !== undefined) {
-      const raw = Array.isArray(xResourceVersion)
-        ? xResourceVersion[0]
-        : xResourceVersion;
+      const raw = firstHeaderValue(xResourceVersion);
       const parsed = parsePositiveInteger(raw);
       if (parsed === null) {
         sendBadRequest(
@@ -640,7 +710,7 @@ export function createUpdateProductHandler(deps: {
     }
 
     const validation = validateProductBody(body, "update");
-    if (!validation.ok) {
+    if (validation.ok !== true) {
       sendError(
         reply,
         validation.statusCode,
@@ -654,7 +724,7 @@ export function createUpdateProductHandler(deps: {
     const result = await deps.productRepository.updateProduct({
       workspaceId: ctx.workspaceId,
       productId: request.params.productId,
-      input: validation.input as UpdateProductInput,
+      input: validation.input,
       expectedVersion
     });
 
