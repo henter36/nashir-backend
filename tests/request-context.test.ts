@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTOR_ID_HEADER,
+  GRANTED_PERMISSIONS_HEADER,
   WORKSPACE_ID_HEADER,
   requireRequestContext,
   resolveRequestContextFromHeaders,
@@ -9,6 +10,20 @@ import {
 } from "../src/request-context.js";
 
 type RawHeaders = Record<string, string | readonly string[] | undefined>;
+
+function expectResolvedContext(
+  result: ReturnType<typeof resolveRequestContextFromHeaders>,
+  grantedPermissions: readonly string[] = []
+): void {
+  expect(result).toEqual({
+    ok: true,
+    context: {
+      workspaceId: "workspace-123",
+      actorId: "actor-456",
+      grantedPermissions
+    }
+  });
+}
 
 describe("resolveRequestContextFromHeaders", () => {
   it("returns context when both headers are present", () => {
@@ -19,7 +34,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -31,7 +50,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -43,7 +66,11 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-123", actorId: "actor-456" }
+      context: {
+        workspaceId: "workspace-123",
+        actorId: "actor-456",
+        grantedPermissions: []
+      }
     });
   });
 
@@ -205,8 +232,75 @@ describe("resolveRequestContextFromHeaders", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { workspaceId: "workspace-first", actorId: "actor-first" }
+      context: {
+        workspaceId: "workspace-first",
+        actorId: "actor-first",
+        grantedPermissions: []
+      }
     });
+  });
+  it.each([
+    ["absent", undefined, []],
+    ["blank", "", []],
+    ["whitespace-only", "   ", []],
+    ["single permission", "nashir.products.read", ["nashir.products.read"]],
+    [
+      "comma-separated permissions",
+      "nashir.products.read,nashir.products.manage",
+      ["nashir.products.read", "nashir.products.manage"]
+    ],
+    [
+      "trimmed entries",
+      " nashir.products.read , nashir.products.manage ",
+      ["nashir.products.read", "nashir.products.manage"]
+    ],
+    [
+      "empty entries filtered",
+      "nashir.products.read,, ,nashir.products.manage",
+      ["nashir.products.read", "nashir.products.manage"]
+    ],
+    [
+      "deduplicated entries",
+      "nashir.products.read,nashir.products.read,nashir.products.manage",
+      ["nashir.products.read", "nashir.products.manage"]
+    ]
+  ])("parses granted permissions: %s", (_caseName, headerValue, expected) => {
+    const headers: Record<string, string | undefined> = {
+      [WORKSPACE_ID_HEADER]: "workspace-123",
+      [ACTOR_ID_HEADER]: "actor-456"
+    };
+
+    if (headerValue !== undefined) {
+      headers[GRANTED_PERMISSIONS_HEADER] = headerValue;
+    }
+
+    expectResolvedContext(
+      resolveRequestContextFromHeaders(headers),
+      expected as readonly string[]
+    );
+  });
+
+  it("reads the permissions header name case-insensitively", () => {
+    expectResolvedContext(
+      resolveRequestContextFromHeaders({
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        "X-Nashir-Granted-Permissions": "nashir.products.read"
+      }),
+      ["nashir.products.read"]
+    );
+  });
+
+  it("treats permission values as case-sensitive exact strings and does not merge differently-cased duplicates", () => {
+    expectResolvedContext(
+      resolveRequestContextFromHeaders({
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [GRANTED_PERMISSIONS_HEADER]:
+          "nashir.products.read,NASHIR.PRODUCTS.READ,Nashir.Products.Read"
+      }),
+      ["nashir.products.read", "NASHIR.PRODUCTS.READ", "Nashir.Products.Read"]
+    );
   });
 });
 
@@ -219,7 +313,8 @@ describe("requireRequestContext", () => {
 
     expect(requireRequestContext(result)).toEqual({
       workspaceId: "workspace-123",
-      actorId: "actor-456"
+      actorId: "actor-456",
+      grantedPermissions: []
     });
   });
 

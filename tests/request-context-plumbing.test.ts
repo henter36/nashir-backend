@@ -5,6 +5,7 @@ import { buildApp } from "../src/app.js";
 import {
   ACTOR_ID_HEADER,
   CORRELATION_ID_HEADER,
+  GRANTED_PERMISSIONS_HEADER,
   WORKSPACE_ID_HEADER
 } from "../src/request-context.js";
 
@@ -40,6 +41,7 @@ async function harnessHandler(request: FastifyRequest) {
   return {
     workspaceId: request.requestContext?.workspaceId ?? null,
     actorId: request.requestContext?.actorId ?? null,
+    grantedPermissions: request.requestContext?.grantedPermissions ?? null,
     correlationId: request.correlationId ?? null
   };
 }
@@ -503,4 +505,39 @@ describe("request-context plumbing on a gated non-health harness route", () => {
     expect(typeof body.correlationId).toBe("string");
     expect(body.correlationId.length).toBeGreaterThan(0);
   });
+  it.each([
+    ["absent", undefined, []],
+    [
+      "present",
+      "nashir.products.read,nashir.products.manage",
+      ["nashir.products.read", "nashir.products.manage"]
+    ],
+    [
+      "trimmed and deduplicated",
+      " nashir.products.read , nashir.products.read , nashir.products.manage ",
+      ["nashir.products.read", "nashir.products.manage"]
+    ]
+  ])(
+    "attaches grantedPermissions when permissions header is %s",
+    async (_caseName, headerValue, expected) => {
+      const app = buildAppWithHarness();
+      const headers: Record<string, string> = {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456"
+      };
+
+      if (headerValue !== undefined) {
+        headers[GRANTED_PERMISSIONS_HEADER] = headerValue;
+      }
+
+      const { statusCode, body } = await injectAndParse(app, {
+        method: "GET",
+        url: TEST_HARNESS_ROUTE,
+        headers
+      });
+
+      expect(statusCode).toBe(200);
+      expect(body.grantedPermissions).toEqual(expected);
+    }
+  );
 });
