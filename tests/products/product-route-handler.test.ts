@@ -235,33 +235,18 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("BAD_REQUEST");
     });
 
-    it("returns 400 when limit is not a positive integer", async () => {
-      const app = buildHarnessApp();
-
-      const { response: r1 } = await harnessInject(app, {
-        method: "GET",
-        url: `${PRODUCTS_URL}?limit=0`
-      });
-      expect(r1.statusCode).toBe(400);
-
-      const { response: r2 } = await harnessInject(app, {
-        method: "GET",
-        url: `${PRODUCTS_URL}?limit=-5`
-      });
-      expect(r2.statusCode).toBe(400);
-
-      const { response: r3 } = await harnessInject(app, {
-        method: "GET",
-        url: `${PRODUCTS_URL}?limit=abc`
-      });
-      expect(r3.statusCode).toBe(400);
-
-      const { response: r4 } = await harnessInject(app, {
-        method: "GET",
-        url: `${PRODUCTS_URL}?limit=1.5`
-      });
-      expect(r4.statusCode).toBe(400);
-    });
+    it.each(["0", "-5", "abc", "1.5"])(
+      "returns 400 when limit is not a positive integer: %s",
+      async (limit) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "GET",
+          url: `${PRODUCTS_URL}?limit=${limit}`
+        });
+        expect(response.statusCode).toBe(400);
+        expect(body.code).toBe("BAD_REQUEST");
+      }
+    );
 
     it("returns 400 when limit exceeds 100", async () => {
       const app = buildHarnessApp();
@@ -503,35 +488,23 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("BAD_REQUEST");
     });
 
-    it("returns 422 when body includes workspaceId", async () => {
-      const app = buildHarnessApp();
-      const { response, body } = await harnessInject(app, {
-        method: "POST",
-        url: PRODUCTS_URL,
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": "key-ws-id"
-        },
-        payload: JSON.stringify({ name: "Test", workspaceId: "ws-123" })
-      });
-      expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
-    });
-
-    it("returns 422 when body includes workspace_id", async () => {
-      const app = buildHarnessApp();
-      const { response, body } = await harnessInject(app, {
-        method: "POST",
-        url: PRODUCTS_URL,
-        headers: {
-          "content-type": "application/json",
-          "idempotency-key": "key-ws-id2"
-        },
-        payload: JSON.stringify({ name: "Test", workspace_id: "ws-123" })
-      });
-      expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
-    });
+    it.each(["workspaceId", "workspace_id"])(
+      "returns 422 when body includes %s",
+      async (field) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "POST",
+          url: PRODUCTS_URL,
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": `key-${field}`
+          },
+          payload: JSON.stringify({ name: "Test", [field]: "ws-123" })
+        });
+        expect(response.statusCode).toBe(422);
+        expect(body.code).toBe("VALIDATION_FAILED");
+      }
+    );
 
     it("returns 422 when name is missing from body", async () => {
       const app = buildHarnessApp();
@@ -822,68 +795,32 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("BAD_REQUEST");
     });
 
-    it("returns 400 when If-Match contains a non-integer value", async () => {
-      const app = buildHarnessApp();
+    it.each(['"not-a-number"', '"abc"', "1abc", ""])(
+      "returns 400 when If-Match is invalid: %j",
+      async (ifMatch) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "PUT",
+          url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
+          headers: {
+            "content-type": "application/json",
+            "if-match": ifMatch
+          },
+          payload: JSON.stringify({ name: "Updated" })
+        });
+        expect(response.statusCode).toBe(400);
+        expect(body.code).toBe("BAD_REQUEST");
+      }
+    );
 
-      const { response: r1, body: b1 } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "if-match": '"not-a-number"'
-        },
-        payload: JSON.stringify({ name: "Updated" })
-      });
-      expect(r1.statusCode).toBe(400);
-      expect(b1.code).toBe("BAD_REQUEST");
-
-      const { response: r2, body: b2 } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "if-match": '"abc"'
-        },
-        payload: JSON.stringify({ name: "Updated" })
-      });
-      expect(r2.statusCode).toBe(400);
-      expect(b2.code).toBe("BAD_REQUEST");
-    });
-
-    it("returns 400 when X-Resource-Version is zero or negative", async () => {
-      const app = buildHarnessApp();
-
-      const { response: r1 } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "x-resource-version": "0"
-        },
-        payload: JSON.stringify({ name: "Updated" })
-      });
-      expect(r1.statusCode).toBe(400);
-
-      const { response: r2 } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "x-resource-version": "-1"
-        },
-        payload: JSON.stringify({ name: "Updated" })
-      });
-      expect(r2.statusCode).toBe(400);
-    });
-
-    it("returns 400 when If-Match header value is empty", async () => {
+    it("returns 400 when If-Match is not a string", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
         method: "PUT",
         url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
-          "if-match": ""
+          "if-match": ["1", "2"] as unknown as string
         },
         payload: JSON.stringify({ name: "Updated" })
       });
@@ -891,35 +828,41 @@ describeDb("Product Route Handlers", () => {
       expect(body.code).toBe("BAD_REQUEST");
     });
 
-    it("returns 422 when body includes workspaceId", async () => {
-      const app = buildHarnessApp();
-      const { response, body } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "if-match": "1"
-        },
-        payload: JSON.stringify({ name: "Updated", workspaceId: "ws-123" })
-      });
-      expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
-    });
+    it.each(["0", "-1", "1abc"])(
+      "returns 400 when X-Resource-Version is invalid: %s",
+      async (version) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "PUT",
+          url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
+          headers: {
+            "content-type": "application/json",
+            "x-resource-version": version
+          },
+          payload: JSON.stringify({ name: "Updated" })
+        });
+        expect(response.statusCode).toBe(400);
+        expect(body.code).toBe("BAD_REQUEST");
+      }
+    );
 
-    it("returns 422 when body includes workspace_id", async () => {
-      const app = buildHarnessApp();
-      const { response, body } = await harnessInject(app, {
-        method: "PUT",
-        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
-        headers: {
-          "content-type": "application/json",
-          "if-match": "1"
-        },
-        payload: JSON.stringify({ name: "Updated", workspace_id: "ws-123" })
-      });
-      expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
-    });
+    it.each(["workspaceId", "workspace_id"])(
+      "returns 422 when body includes %s",
+      async (field) => {
+        const app = buildHarnessApp();
+        const { response, body } = await harnessInject(app, {
+          method: "PUT",
+          url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
+          headers: {
+            "content-type": "application/json",
+            "if-match": "1"
+          },
+          payload: JSON.stringify({ name: "Updated", [field]: "ws-123" })
+        });
+        expect(response.statusCode).toBe(422);
+        expect(body.code).toBe("VALIDATION_FAILED");
+      }
+    );
 
     it.each([
       [

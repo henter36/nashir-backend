@@ -8,11 +8,11 @@ import type { IdempotencyRepository } from "../idempotency/idempotency-repositor
 import type { JsonValue } from "../idempotency/idempotency-types.js";
 import type { ProductRepository } from "./product-repository.js";
 import type {
+  ListProductsQuerystring,
   ProductItemRouteParams,
   ProductListResponse,
   ProductResponse,
-  ProductRouteParams,
-  ListProductsQuerystring
+  ProductRouteParams
 } from "./product-schema.js";
 import {
   PRODUCT_STATUSES,
@@ -35,6 +35,14 @@ function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
 
+function parsePositiveInteger(value: unknown): number | null {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 function sendError(
   reply: FastifyReply,
   statusCode: number,
@@ -53,6 +61,15 @@ function sendError(
   reply.code(statusCode).send(response.body);
 }
 
+function sendBadRequest(
+  reply: FastifyReply,
+  message: string,
+  correlationId: string | undefined,
+  details?: unknown
+): void {
+  sendError(reply, 400, "BAD_REQUEST", message, correlationId, details);
+}
+
 function sendValidationFailed(
   reply: FastifyReply,
   message: string,
@@ -61,60 +78,102 @@ function sendValidationFailed(
   sendError(reply, 422, "VALIDATION_FAILED", message, correlationId);
 }
 
+function sendNotFound(
+  reply: FastifyReply,
+  correlationId: string | undefined
+): void {
+  sendError(reply, 404, "NOT_FOUND", "Resource not found.", correlationId);
+}
+
+type ResolvedCtx = NonNullable<FastifyRequest["requestContext"]>;
+
+function resolveContextAndPermission(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  requiredPermission: string
+): { ok: true; ctx: ResolvedCtx } | { ok: false } {
+  const ctx = request.requestContext;
+  if (!ctx) {
+    sendError(
+      reply,
+      500,
+      "INTERNAL_SERVER_ERROR",
+      "Internal server error.",
+      request.correlationId
+    );
+    return { ok: false };
+  }
+  const decision = evaluatePermissionGuard({
+    requiredPermission,
+    grantedPermissions: ctx.grantedPermissions ?? [],
+    requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
+  });
+  if (!decision.ok) {
+    sendError(
+      reply,
+      decision.statusCode,
+      decision.code,
+      decision.message,
+      request.correlationId
+    );
+    return { ok: false };
+  }
+  return { ok: true, ctx };
+}
+
 type ValidateMode = "create" | "update";
 
-function validateProductPayload(
+type ValidateOk = { ok: true; input: CreateProductInput | UpdateProductInput };
+type ValidateFail = {
+  ok: false;
+  statusCode: 400 | 422;
+  code: "BAD_REQUEST" | "VALIDATION_FAILED";
+  message: string;
+};
+
+function validateProductBody(
   body: Record<string, unknown>,
-  mode: ValidateMode,
-  correlationId: string | undefined,
-  reply: FastifyReply
-): boolean {
+  mode: ValidateMode
+): ValidateOk | ValidateFail {
+  const validationFailed = (message: string): ValidateFail => ({
+    ok: false,
+    statusCode: 422,
+    code: "VALIDATION_FAILED",
+    message
+  });
+
   if (mode === "create") {
     if (
       !body.name ||
       typeof body.name !== "string" ||
       body.name.trim().length === 0
     ) {
-      sendValidationFailed(
-        reply,
-        "name is required and must be a non-empty string.",
-        correlationId
+      return validationFailed(
+        "name is required and must be a non-empty string."
       );
-      return false;
     }
   } else if ("name" in body) {
     if (
       typeof body.name !== "string" ||
       (body.name as string).trim().length === 0
     ) {
-      sendValidationFailed(
-        reply,
-        "name must be a non-empty string.",
-        correlationId
-      );
-      return false;
+      return validationFailed("name must be a non-empty string.");
     }
   }
 
-  const stringOrNullFields = [
+  for (const field of [
     "category",
     "sku",
     "imageUrl",
     "videoUrl",
     "description"
-  ] as const;
-  for (const field of stringOrNullFields) {
+  ] as const) {
     if (
       field in body &&
       body[field] !== null &&
       typeof body[field] !== "string"
     ) {
-      sendValidationFailed(
-        reply,
-        `${field} must be a string or null.`,
-        correlationId
-      );
-      return false;
+      return validationFailed(`${field} must be a string or null.`);
     }
   }
 
@@ -122,48 +181,82 @@ function validateProductPayload(
     "status" in body &&
     !PRODUCT_STATUSES.includes(body.status as ProductStatus)
   ) {
-    sendValidationFailed(
-      reply,
-      "status must be one of: draft, active, archived.",
-      correlationId
-    );
-    return false;
+    return validationFailed("status must be one of: draft, active, archived.");
   }
 
   if (
     "stockStatus" in body &&
     !STOCK_STATUSES.includes(body.stockStatus as StockStatus)
   ) {
-    sendValidationFailed(
-      reply,
-      "stockStatus must be one of: available, limited, out_of_stock, unknown.",
-      correlationId
+    return validationFailed(
+      "stockStatus must be one of: available, limited, out_of_stock, unknown."
     );
-    return false;
   }
 
   if ("price" in body && body.price !== null) {
-    if (typeof body.price !== "number" || body.price < 0) {
-      sendValidationFailed(
-        reply,
-        "price must be a non-negative number or null.",
-        correlationId
-      );
-      return false;
+    if (
+      typeof body.price !== "number" ||
+      !Number.isFinite(body.price) ||
+      body.price < 0
+    ) {
+      return validationFailed("price must be a non-negative number or null.");
     }
   }
 
-  return true;
+  if (mode === "update") {
+    const input = buildUpdateInput(body);
+    if (!hasUpdateFields(input)) {
+      return {
+        ok: false,
+        statusCode: 400,
+        code: "BAD_REQUEST",
+        message: "At least one product field is required for update."
+      };
+    }
+    return { ok: true, input };
+  }
+
+  return { ok: true, input: buildCreateInput(body) };
+}
+
+function buildCreateInput(body: Record<string, unknown>): CreateProductInput {
+  return {
+    name: body.name as string,
+    category: "category" in body ? (body.category as string | null) : undefined,
+    price: "price" in body ? (body.price as number | null) : undefined,
+    sku: "sku" in body ? (body.sku as string | null) : undefined,
+    stockStatus:
+      "stockStatus" in body ? (body.stockStatus as StockStatus) : undefined,
+    imageUrl: "imageUrl" in body ? (body.imageUrl as string | null) : undefined,
+    videoUrl: "videoUrl" in body ? (body.videoUrl as string | null) : undefined,
+    description:
+      "description" in body ? (body.description as string | null) : undefined,
+    status: "status" in body ? (body.status as ProductStatus) : undefined
+  };
+}
+
+function buildUpdateInput(body: Record<string, unknown>): UpdateProductInput {
+  const input: UpdateProductInput = {};
+  if ("name" in body) input.name = body.name as string;
+  if ("category" in body) input.category = body.category as string | null;
+  if ("price" in body) input.price = body.price as number | null;
+  if ("sku" in body) input.sku = body.sku as string | null;
+  if ("stockStatus" in body)
+    input.stockStatus = body.stockStatus as StockStatus;
+  if ("imageUrl" in body) input.imageUrl = body.imageUrl as string | null;
+  if ("videoUrl" in body) input.videoUrl = body.videoUrl as string | null;
+  if ("description" in body)
+    input.description = body.description as string | null;
+  if ("status" in body) input.status = body.status as ProductStatus;
+  return input;
 }
 
 function hasUpdateFields(input: UpdateProductInput): boolean {
-  return Object.values(input).some((value) => value !== undefined);
+  return Object.values(input).some((v) => v !== undefined);
 }
 
 function sortObjectKeys(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortObjectKeys);
-  }
+  if (Array.isArray(value)) return value.map(sortObjectKeys);
   if (value !== null && typeof value === "object") {
     return Object.keys(value as object)
       .sort()
@@ -195,40 +288,6 @@ function computeFingerprint(params: {
   return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
-function buildCreateInput(body: Record<string, unknown>): CreateProductInput {
-  return {
-    name: body.name as string,
-    category: "category" in body ? (body.category as string | null) : undefined,
-    price: "price" in body ? (body.price as number | null) : undefined,
-    sku: "sku" in body ? (body.sku as string | null) : undefined,
-    stockStatus:
-      "stockStatus" in body ? (body.stockStatus as StockStatus) : undefined,
-    imageUrl: "imageUrl" in body ? (body.imageUrl as string | null) : undefined,
-    videoUrl: "videoUrl" in body ? (body.videoUrl as string | null) : undefined,
-    description:
-      "description" in body ? (body.description as string | null) : undefined,
-    status: "status" in body ? (body.status as ProductStatus) : undefined
-  };
-}
-
-function buildUpdateInput(body: Record<string, unknown>): UpdateProductInput {
-  const input: UpdateProductInput = {};
-
-  if ("name" in body) input.name = body.name as string;
-  if ("category" in body) input.category = body.category as string | null;
-  if ("price" in body) input.price = body.price as number | null;
-  if ("sku" in body) input.sku = body.sku as string | null;
-  if ("stockStatus" in body)
-    input.stockStatus = body.stockStatus as StockStatus;
-  if ("imageUrl" in body) input.imageUrl = body.imageUrl as string | null;
-  if ("videoUrl" in body) input.videoUrl = body.videoUrl as string | null;
-  if ("description" in body)
-    input.description = body.description as string | null;
-  if ("status" in body) input.status = body.status as ProductStatus;
-
-  return input;
-}
-
 export function createListProductsHandler(deps: {
   productRepository: ProductRepository;
 }) {
@@ -239,107 +298,61 @@ export function createListProductsHandler(deps: {
     }>,
     reply: FastifyReply
   ): Promise<ProductListResponse | void> {
-    const ctx = request.requestContext;
-    if (!ctx) {
-      sendError(
-        reply,
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "Internal server error.",
-        request.correlationId
-      );
-      return;
-    }
-
-    const decision = evaluatePermissionGuard({
-      requiredPermission: PERMISSION_READ,
-      grantedPermissions: ctx.grantedPermissions ?? [],
-      requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
-    });
-
-    if (!decision.ok) {
-      sendError(
-        reply,
-        decision.statusCode,
-        decision.code,
-        decision.message,
-        request.correlationId
-      );
-      return;
-    }
+    const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
+    if (!check.ok) return;
+    const { ctx } = check;
 
     const q = request.query;
 
     if (q.limit === undefined || q.limit === "") {
-      sendError(
-        reply,
-        400,
-        "BAD_REQUEST",
-        "limit is required.",
-        request.correlationId
-      );
+      sendBadRequest(reply, "limit is required.", request.correlationId);
       return;
     }
-
     const limitNum = Number(q.limit);
     if (!Number.isInteger(limitNum) || limitNum <= 0) {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "limit must be a positive integer.",
         request.correlationId
       );
       return;
     }
-
     if (limitNum > 100) {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "limit must not exceed 100.",
         request.correlationId
       );
       return;
     }
-
     if (
       q.status !== undefined &&
       !PRODUCT_STATUSES.includes(q.status as ProductStatus)
     ) {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "status must be one of: draft, active, archived.",
         request.correlationId
       );
       return;
     }
-
     if (q.updatedAfter !== undefined) {
       const parsed = new Date(q.updatedAfter);
-      if (isNaN(parsed.getTime())) {
-        sendError(
+      if (Number.isNaN(parsed.getTime())) {
+        sendBadRequest(
           reply,
-          400,
-          "BAD_REQUEST",
           "updatedAfter must be a valid date.",
           request.correlationId
         );
         return;
       }
     }
-
     if (
       q.sort !== undefined &&
       !SORT_DIRECTIONS.includes(q.sort as SortDirection)
     ) {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "sort must be one of: updatedAt:desc, updatedAt:asc.",
         request.correlationId
       );
@@ -361,13 +374,7 @@ export function createListProductsHandler(deps: {
         err instanceof Error &&
         err.message === "Invalid product list cursor"
       ) {
-        sendError(
-          reply,
-          400,
-          "BAD_REQUEST",
-          "Invalid cursor.",
-          request.correlationId
-        );
+        sendBadRequest(reply, "Invalid cursor.", request.correlationId);
         return;
       }
       throw err;
@@ -393,34 +400,13 @@ export function createCreateProductHandler(deps: {
     }>,
     reply: FastifyReply
   ): Promise<ProductResponse | void> {
-    const ctx = request.requestContext;
-    if (!ctx) {
-      sendError(
-        reply,
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "Internal server error.",
-        request.correlationId
-      );
-      return;
-    }
-
-    const decision = evaluatePermissionGuard({
-      requiredPermission: PERMISSION_MANAGE,
-      grantedPermissions: ctx.grantedPermissions ?? [],
-      requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
-    });
-
-    if (!decision.ok) {
-      sendError(
-        reply,
-        decision.statusCode,
-        decision.code,
-        decision.message,
-        request.correlationId
-      );
-      return;
-    }
+    const check = resolveContextAndPermission(
+      request,
+      reply,
+      PERMISSION_MANAGE
+    );
+    if (!check.ok) return;
+    const { ctx } = check;
 
     const rawKey = request.headers["idempotency-key"];
     const idempotencyKey =
@@ -431,10 +417,8 @@ export function createCreateProductHandler(deps: {
           : undefined;
 
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "Idempotency-Key header is required.",
         request.correlationId
       );
@@ -444,34 +428,40 @@ export function createCreateProductHandler(deps: {
     const body = request.body ?? {};
 
     if ("workspaceId" in body || "workspace_id" in body) {
-      sendError(
+      sendValidationFailed(
         reply,
-        422,
-        "VALIDATION_FAILED",
         "Request body must not include workspaceId or workspace_id.",
         request.correlationId
       );
       return;
     }
 
-    if (!validateProductPayload(body, "create", request.correlationId, reply)) {
+    const validation = validateProductBody(body, "create");
+    if (!validation.ok) {
+      sendError(
+        reply,
+        validation.statusCode,
+        validation.code,
+        validation.message,
+        request.correlationId
+      );
       return;
     }
 
+    const trimmedKey = idempotencyKey.trim();
     const fingerprint = computeFingerprint({
       workspaceId: ctx.workspaceId,
       actorId: ctx.actorId,
-      idempotencyKey: idempotencyKey.trim(),
+      idempotencyKey: trimmedKey,
       body
     });
 
     const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
-
     const scope = {
       workspaceId: ctx.workspaceId,
       actorId: ctx.actorId,
       operationName: "product.create",
-      idempotencyKey: idempotencyKey.trim()
+      idempotencyKey: trimmedKey
     };
 
     const idempotencyResult =
@@ -483,7 +473,6 @@ export function createCreateProductHandler(deps: {
 
     if (idempotencyResult.status === "existing") {
       const record = idempotencyResult.record;
-
       if (record.requestFingerprint !== fingerprint) {
         sendError(
           reply,
@@ -494,11 +483,9 @@ export function createCreateProductHandler(deps: {
         );
         return;
       }
-
       if (record.responseStatusCode === 201) {
         return reply.code(201).send(record.responseBody) as unknown as void;
       }
-
       sendError(
         reply,
         409,
@@ -513,20 +500,16 @@ export function createCreateProductHandler(deps: {
     try {
       product = await deps.productRepository.createProduct({
         workspaceId: ctx.workspaceId,
-        input: buildCreateInput(body)
+        input: validation.input as CreateProductInput
       });
     } catch (err) {
       await deps.idempotencyRepository
-        .markIdempotencyRecordFailed({
-          ...scope,
-          responseStatusCode: 500
-        })
+        .markIdempotencyRecordFailed({ ...scope, responseStatusCode: 500 })
         .catch(() => undefined);
       throw err;
     }
 
     const productResponse: ProductResponse = { product };
-
     await deps.idempotencyRepository.markIdempotencyRecordCompleted({
       ...scope,
       responseStatusCode: 201,
@@ -545,43 +528,12 @@ export function createGetProductHandler(deps: {
     request: FastifyRequest<{ Params: ProductItemRouteParams }>,
     reply: FastifyReply
   ): Promise<ProductResponse | void> {
-    const ctx = request.requestContext;
-    if (!ctx) {
-      sendError(
-        reply,
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "Internal server error.",
-        request.correlationId
-      );
-      return;
-    }
-
-    const decision = evaluatePermissionGuard({
-      requiredPermission: PERMISSION_READ,
-      grantedPermissions: ctx.grantedPermissions ?? [],
-      requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
-    });
-
-    if (!decision.ok) {
-      sendError(
-        reply,
-        decision.statusCode,
-        decision.code,
-        decision.message,
-        request.correlationId
-      );
-      return;
-    }
+    const check = resolveContextAndPermission(request, reply, PERMISSION_READ);
+    if (!check.ok) return;
+    const { ctx } = check;
 
     if (!isUuid(request.params.productId)) {
-      sendError(
-        reply,
-        404,
-        "NOT_FOUND",
-        "Resource not found.",
-        request.correlationId
-      );
+      sendNotFound(reply, request.correlationId);
       return;
     }
 
@@ -591,13 +543,7 @@ export function createGetProductHandler(deps: {
     });
 
     if (!product) {
-      sendError(
-        reply,
-        404,
-        "NOT_FOUND",
-        "Resource not found.",
-        request.correlationId
-      );
+      sendNotFound(reply, request.correlationId);
       return;
     }
 
@@ -615,70 +561,37 @@ export function createUpdateProductHandler(deps: {
     }>,
     reply: FastifyReply
   ): Promise<ProductResponse | void> {
-    const ctx = request.requestContext;
-    if (!ctx) {
-      sendError(
-        reply,
-        500,
-        "INTERNAL_SERVER_ERROR",
-        "Internal server error.",
-        request.correlationId
-      );
-      return;
-    }
-
-    const decision = evaluatePermissionGuard({
-      requiredPermission: PERMISSION_MANAGE,
-      grantedPermissions: ctx.grantedPermissions ?? [],
-      requestContext: { workspaceId: ctx.workspaceId, actorId: ctx.actorId }
-    });
-
-    if (!decision.ok) {
-      sendError(
-        reply,
-        decision.statusCode,
-        decision.code,
-        decision.message,
-        request.correlationId
-      );
-      return;
-    }
+    const check = resolveContextAndPermission(
+      request,
+      reply,
+      PERMISSION_MANAGE
+    );
+    if (!check.ok) return;
+    const { ctx } = check;
 
     if (!isUuid(request.params.productId)) {
-      sendError(
-        reply,
-        404,
-        "NOT_FOUND",
-        "Resource not found.",
-        request.correlationId
-      );
+      sendNotFound(reply, request.correlationId);
       return;
     }
 
     const ifMatch = request.headers["if-match"];
     const xResourceVersion = request.headers["x-resource-version"];
-
     let expectedVersion: number;
 
     if (ifMatch !== undefined) {
-      const raw = Array.isArray(ifMatch) ? ifMatch[0] : ifMatch;
-      if (typeof raw !== "string") {
-        sendError(
+      if (typeof ifMatch !== "string") {
+        sendBadRequest(
           reply,
-          400,
-          "BAD_REQUEST",
           "If-Match must be a positive integer or quoted positive integer.",
           request.correlationId
         );
         return;
       }
-      const stripped = raw.replace(/^"(.*)"$/, "$1");
-      const parsed = parseInt(stripped, 10);
-      if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-        sendError(
+      const stripped = ifMatch.replace(/^"(.*)"$/, "$1");
+      const parsed = parsePositiveInteger(stripped);
+      if (parsed === null) {
+        sendBadRequest(
           reply,
-          400,
-          "BAD_REQUEST",
           "If-Match must be a positive integer or quoted positive integer.",
           request.correlationId
         );
@@ -689,12 +602,10 @@ export function createUpdateProductHandler(deps: {
       const raw = Array.isArray(xResourceVersion)
         ? xResourceVersion[0]
         : xResourceVersion;
-      const parsed = parseInt(raw, 10);
-      if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-        sendError(
+      const parsed = parsePositiveInteger(raw);
+      if (parsed === null) {
+        sendBadRequest(
           reply,
-          400,
-          "BAD_REQUEST",
           "X-Resource-Version must be a positive integer.",
           request.correlationId
         );
@@ -702,10 +613,8 @@ export function createUpdateProductHandler(deps: {
       }
       expectedVersion = parsed;
     } else {
-      sendError(
+      sendBadRequest(
         reply,
-        400,
-        "BAD_REQUEST",
         "If-Match or X-Resource-Version header is required.",
         request.correlationId
       );
@@ -715,28 +624,21 @@ export function createUpdateProductHandler(deps: {
     const body = request.body ?? {};
 
     if ("workspaceId" in body || "workspace_id" in body) {
-      sendError(
+      sendValidationFailed(
         reply,
-        422,
-        "VALIDATION_FAILED",
         "Request body must not include workspaceId or workspace_id.",
         request.correlationId
       );
       return;
     }
 
-    if (!validateProductPayload(body, "update", request.correlationId, reply)) {
-      return;
-    }
-
-    const input = buildUpdateInput(body);
-
-    if (!hasUpdateFields(input)) {
+    const validation = validateProductBody(body, "update");
+    if (!validation.ok) {
       sendError(
         reply,
-        400,
-        "BAD_REQUEST",
-        "At least one product field is required for update.",
+        validation.statusCode,
+        validation.code,
+        validation.message,
         request.correlationId
       );
       return;
@@ -745,18 +647,12 @@ export function createUpdateProductHandler(deps: {
     const result = await deps.productRepository.updateProduct({
       workspaceId: ctx.workspaceId,
       productId: request.params.productId,
-      input,
+      input: validation.input as UpdateProductInput,
       expectedVersion
     });
 
     if (result.status === "not_found") {
-      sendError(
-        reply,
-        404,
-        "NOT_FOUND",
-        "Resource not found.",
-        request.correlationId
-      );
+      sendNotFound(reply, request.correlationId);
       return;
     }
 
@@ -767,7 +663,9 @@ export function createUpdateProductHandler(deps: {
         "CONFLICT",
         "Version conflict.",
         request.correlationId,
-        { currentVersion: result.currentVersion }
+        {
+          currentVersion: result.currentVersion
+        }
       );
       return;
     }
