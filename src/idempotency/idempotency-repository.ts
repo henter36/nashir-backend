@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { QueryResult, QueryResultRow } from "pg";
 import {
   mapIdempotencyRecordRow,
@@ -26,12 +25,9 @@ export class IdempotencyRepository {
   async reserveIdempotencyRecord(
     input: ReserveIdempotencyRecordInput
   ): Promise<ReserveIdempotencyRecordResult> {
-    const recordId = randomUUID();
-
     const result = await this.db.query<IdempotencyRecordRow>(
       `
         INSERT INTO idempotency_records (
-          idempotency_record_id,
           workspace_id,
           actor_id,
           operation_name,
@@ -40,7 +36,7 @@ export class IdempotencyRepository {
           status,
           expires_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, 'in_progress', $7)
+        VALUES ($1, $2, $3, $4, $5, 'in_progress', $6)
         ON CONFLICT (
           workspace_id,
           actor_id,
@@ -51,7 +47,6 @@ export class IdempotencyRepository {
         RETURNING *;
       `,
       [
-        recordId,
         input.workspaceId,
         input.actorId,
         input.operationName,
