@@ -123,12 +123,12 @@ No frontend/Product UI files.
 ### Forbidden static UI route scan
 
 ```bash
-grep -RIn \
+grep -E -RIn \
   --include="*.js" \
   --include="*.ts" \
   --include="*.mjs" \
   --include="*.cjs" \
-  '"/nashir"\|"/nashir/"\|ui/nashir\|marketing-os/ui/nashir' . \
+  '/nashir([^a-zA-Z0-9_-]|$)|ui/nashir|marketing-os/ui/nashir' . \
   | grep -v node_modules \
   | grep -v .git \
   || true
