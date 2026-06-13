@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const PINNED_AUTHORITY_SHA = "36da9ed31903562bddfb7ffd669841956e334a51";
+const PINNED_AUTHORITY_SHA = "13388d787f57e2d863eda960db6de497bd2efa6c";
 const AUTHORITY_FILES = [
   "docs/nashir_v1_openapi.yaml",
   "docs/nashir_auth_rbac_workspace_identity_gate.md",
