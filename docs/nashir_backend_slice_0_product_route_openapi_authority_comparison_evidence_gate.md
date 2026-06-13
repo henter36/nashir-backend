@@ -360,7 +360,7 @@ Relevant OpenAPI lines extracted from the pinned authority file:
 3262:      x-permission: nashir.content.manage
 ```
 
-## 6.1 Authority Product Paths Full Block
+### 6.1 Authority Product Paths Full Block
 
 ```text
               schema:
@@ -561,7 +561,7 @@ Relevant OpenAPI lines extracted from the pinned authority file:
           $ref: "#/components/responses/DefaultError"
 ```
 
-## 6.2 Authority Targeted Component And Parameter Blocks
+### 6.2 Authority Targeted Component And Parameter Blocks
 
 ```text
 
