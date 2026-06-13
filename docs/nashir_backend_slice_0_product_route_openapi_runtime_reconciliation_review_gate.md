@@ -56,7 +56,7 @@ Runtime files reviewed by this gate:
 - `src/error-model.ts`
 - `src/permission-guard.ts`
 - `src/request-context.ts`
-- `src/workspace-context.ts`
+- `src/workspace-context-guard.ts`
 - `tests/products/product-route-handler.test.ts`
 
 Review basis:
