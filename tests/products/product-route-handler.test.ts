@@ -5,6 +5,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import type { FastifyInstance, InjectOptions } from "fastify";
 
 import { buildApp } from "../../src/app.js";
+import { AuditRepository } from "../../src/audit/audit-repository.js";
 import type { AuthConfig } from "../../src/auth-config.js";
 import type { JwksGetKey } from "../../src/auth-guard.js";
 import type { WorkspaceMembershipResolver } from "../../src/workspace-context-guard.js";
@@ -50,6 +51,7 @@ describeDb("Product Route Handlers", () => {
   let pool: pg.Pool;
   let productRepository: ProductRepository;
   let idempotencyRepository: IdempotencyRepository;
+  let auditRepository: AuditRepository;
 
   let privateKey: CryptoKey;
   let jwksGetKey: JwksGetKey;
@@ -83,6 +85,7 @@ describeDb("Product Route Handlers", () => {
 
     productRepository = new ProductRepository(pool);
     idempotencyRepository = new IdempotencyRepository(pool);
+    auditRepository = new AuditRepository(pool);
 
     const keyPair = await generateKeyPair("RS256", { modulusLength: 2048 });
     privateKey = keyPair.privateKey;
@@ -96,6 +99,7 @@ describeDb("Product Route Handlers", () => {
   });
 
   afterEach(async () => {
+    await pool.query("TRUNCATE TABLE audit_events;");
     await truncateProductData(pool);
     await truncateIdempotencyData(pool);
   });
@@ -116,11 +120,14 @@ describeDb("Product Route Handlers", () => {
       .sign(privateKey);
   }
 
-  function buildHarnessApp(): FastifyInstance {
+  function buildHarnessApp(
+    auditRepositoryOverride: AuditRepository = auditRepository
+  ): FastifyInstance {
     const app = buildApp({
       logger: false,
       productRepository,
-      idempotencyRepository
+      idempotencyRepository,
+      auditRepository: auditRepositoryOverride
     });
     openApps.push(app);
     return app;
@@ -135,7 +142,8 @@ describeDb("Product Route Handlers", () => {
       jwksGetKey,
       workspaceMembershipResolver: resolver,
       productRepository,
-      idempotencyRepository
+      idempotencyRepository,
+      auditRepository
     });
     openApps.push(app);
     return app;
@@ -189,6 +197,17 @@ describeDb("Product Route Handlers", () => {
       ...rest
     });
     return { response, body: response.json() };
+  }
+
+  async function auditEvents() {
+    const result = await pool.query<{
+      action_name: string;
+      before_state: Record<string, unknown> | null;
+      after_state: Record<string, unknown> | null;
+    }>(
+      "SELECT action_name, before_state, after_state FROM audit_events ORDER BY created_at;"
+    );
+    return result.rows;
   }
 
   // ───────────────────────── listProducts ─────────────────────────
@@ -519,6 +538,7 @@ describeDb("Product Route Handlers", () => {
       });
       expect(response.statusCode).toBe(422);
       expect(body.code).toBe("VALIDATION_FAILED");
+      expect(await auditEvents()).toHaveLength(0);
     });
 
     it.each([
@@ -560,15 +580,40 @@ describeDb("Product Route Handlers", () => {
         url: PRODUCTS_URL,
         headers: {
           "content-type": "application/json",
-          "idempotency-key": "key-first-create"
+          "idempotency-key": "key-first-create",
+          authorization: "Bearer must-not-be-audited"
         },
-        payload: JSON.stringify({ name: "New Product", status: "active" })
+        payload: JSON.stringify({
+          name: "New Product",
+          status: "active",
+          occurredAt: "2000-01-01T00:00:00.000Z",
+          secret: "must-not-be-audited",
+          token: "must-not-be-audited"
+        })
       });
       expect(response.statusCode).toBe(201);
       expect(body.product).toBeDefined();
       expect(body.product.name).toBe("New Product");
       expect(body.product.status).toBe("active");
       expect(body.product.workspaceId).toBe(KNOWN_WORKSPACE);
+
+      const events = await auditEvents();
+      expect(events).toEqual([
+        {
+          action_name: "product.created",
+          before_state: null,
+          after_state: {
+            productId: body.product.productId,
+            status: "active",
+            idempotencyKey: "key-first-create",
+            version: 1
+          }
+        }
+      ]);
+      expect(JSON.stringify(events)).not.toContain("authorization");
+      expect(JSON.stringify(events)).not.toContain("New Product");
+      expect(JSON.stringify(events)).not.toContain("must-not-be-audited");
+      expect(JSON.stringify(events)).not.toContain("2000-01-01");
     });
 
     it("returns 201 with identical body on idempotency replay", async () => {
@@ -597,6 +642,31 @@ describeDb("Product Route Handlers", () => {
 
       expect(second.response.statusCode).toBe(201);
       expect(second.body.product.productId).toBe(first.body.product.productId);
+      expect(await auditEvents()).toHaveLength(1);
+    });
+
+    it("rolls back product create when the required audit write fails", async () => {
+      class FailingAuditRepository extends AuditRepository {
+        override async createAuditEvent(): Promise<never> {
+          throw new Error("audit write failed");
+        }
+      }
+
+      const app = buildHarnessApp(new FailingAuditRepository(pool));
+      const { response } = await harnessInject(app, {
+        method: "POST",
+        url: PRODUCTS_URL,
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "key-audit-failure"
+        },
+        payload: JSON.stringify({ name: "Must Roll Back" })
+      });
+
+      expect(response.statusCode).toBe(500);
+      const products = await pool.query("SELECT product_id FROM products;");
+      expect(products.rows).toHaveLength(0);
+      expect(await auditEvents()).toHaveLength(0);
     });
 
     it("returns 409 when same key is replayed with different body", async () => {
@@ -899,6 +969,7 @@ describeDb("Product Route Handlers", () => {
         });
         expect(response.statusCode).toBe(expectedStatus);
         expect(body.code).toBe(expectedCode);
+        expect(await auditEvents()).toHaveLength(0);
       }
     );
 
@@ -906,7 +977,7 @@ describeDb("Product Route Handlers", () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
         method: "PUT",
-        url: `${PRODUCTS_URL}/nonexistent-product`,
+        url: `${PRODUCTS_URL}/00000000-0000-0000-0000-000000000001`,
         headers: {
           "content-type": "application/json",
           "if-match": "1"
@@ -915,6 +986,39 @@ describeDb("Product Route Handlers", () => {
       });
       expect(response.statusCode).toBe(404);
       expect(body.code).toBe("NOT_FOUND");
+      expect(await auditEvents()).toHaveLength(0);
+    });
+
+    it("rolls back product update when the required audit write fails", async () => {
+      class FailingAuditRepository extends AuditRepository {
+        override async createAuditEvent(): Promise<never> {
+          throw new Error("audit write failed");
+        }
+      }
+
+      const created = await productRepository.createProduct({
+        workspaceId: KNOWN_WORKSPACE,
+        input: { name: "Original Name" }
+      });
+      const app = buildHarnessApp(new FailingAuditRepository(pool));
+      const { response } = await harnessInject(app, {
+        method: "PUT",
+        url: `${PRODUCTS_URL}/${created.productId}`,
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(created.version)
+        },
+        payload: JSON.stringify({ name: "Must Roll Back" })
+      });
+
+      expect(response.statusCode).toBe(500);
+      const product = await productRepository.getProductById({
+        workspaceId: KNOWN_WORKSPACE,
+        productId: created.productId
+      });
+      expect(product?.name).toBe("Original Name");
+      expect(product?.version).toBe(created.version);
+      expect(await auditEvents()).toHaveLength(0);
     });
 
     it("returns 409 on version conflict with stale expectedVersion", async () => {
@@ -943,6 +1047,7 @@ describeDb("Product Route Handlers", () => {
       expect(response.statusCode).toBe(409);
       expect(body.code).toBe("CONFLICT");
       expect(body.details?.currentVersion).toBe(created.version + 1);
+      expect(await auditEvents()).toHaveLength(0);
     });
 
     it("returns 200 with updated product when version matches", async () => {
@@ -966,6 +1071,21 @@ describeDb("Product Route Handlers", () => {
       expect(body.product.name).toBe("Updated Name");
       expect(body.product.status).toBe("active");
       expect(body.product.version).toBe(created.version + 1);
+
+      expect(await auditEvents()).toEqual([
+        {
+          action_name: "product.updated",
+          before_state: {
+            productId: created.productId,
+            previousVersion: created.version
+          },
+          after_state: {
+            productId: created.productId,
+            newVersion: created.version + 1,
+            changedFields: ["name", "status"]
+          }
+        }
+      ]);
     });
   });
 });
