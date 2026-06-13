@@ -78,7 +78,9 @@ GENERATED_TYPES_FILE_EXISTS=YES
 ### 4.8 Local Stash Evidence
 
 ```text
-
+stash@{0}: On main: pre-product-route-openapi-authority-edit-clean-worktree
+stash@{1}: On main: wip before runtime defensive guards
+stash@{2}: On main: wip campaign wizard shared campaign state
 ```
 
 ## 5. Stash Handling Decision
