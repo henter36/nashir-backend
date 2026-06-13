@@ -10,7 +10,9 @@ Authority pin update and reconciliation gate.
 
 This gate updates the backend repository authority validation pin after the accepted authority OpenAPI edit was merged.
 
-This gate does not authorize runtime implementation, generated client regeneration, SQL migrations, copied OpenAPI files, route expansion, CI workflow changes, UI work, or deployment work.
+This gate does not authorize runtime implementation, generated client regeneration, SQL migrations, copied OpenAPI files, route expansion, UI work, or deployment work.
+
+This gate authorizes only one CI synchronization change: updating the existing authority checkout and validation refs in `.github/workflows/ci.yml` from the previous authority pin to the new accepted authority pin.
 
 ## 3. Purpose
 
@@ -51,6 +53,7 @@ The backend repository must now update its pinned authority SHA so future contra
 Expected changed backend files:
 
 - `scripts/validate-contract-authority.mjs`
+- `.github/workflows/ci.yml`
 - `docs/nashir_backend_slice_0_openapi_authority_pin_update_reconciliation_gate.md`
 
 No backend OpenAPI copy is allowed.
@@ -101,6 +104,7 @@ PASS: Contract authority validation completed successfully.
 | Backend generated client directories absent | Verified by validator | Accepted |
 | Runtime code unchanged | Required by gate scope | Accepted |
 | SQL migrations unchanged | Required by gate scope | Accepted |
+| Existing CI authority ref synchronized | `.github/workflows/ci.yml` uses the new authority pin for checkout and validation | Accepted |
 
 ## 8. Generated Types Boundary
 
@@ -127,7 +131,8 @@ This gate does not authorize:
 - Product route expansion.
 - ErrorModel edits.
 - Pagination policy changes.
-- CI workflow changes.
+- New CI workflows.
+- CI behavior changes beyond synchronizing the existing authority ref.
 - UI changes.
 - Deployment work.
 
@@ -136,6 +141,7 @@ This gate does not authorize:
 | Risk | Status | Control |
 | :--- | :--- | :--- |
 | Backend validator may reject the new authority SHA | Mitigated | Validation passed against the new pin. |
+| CI may keep validating the previous authority pin | Mitigated | Existing CI authority checkout and validation refs are synchronized to the new pin. |
 | Generated TypeScript types may be stale after authority edit | Open | Separate generated-types regeneration gate required. |
 | Backend could accidentally copy authority OpenAPI | Controlled | Validator confirms copied authority files are absent. |
 | Runtime could drift from updated authority | Controlled | Runtime was the basis for the accepted authority edit. |
