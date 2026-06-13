@@ -71,7 +71,11 @@ export class AuditRepository {
       await client.query("COMMIT");
       return result;
     } catch (error) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Preserve the original transaction error if rollback itself fails.
+      }
       throw error;
     } finally {
       client.release();
