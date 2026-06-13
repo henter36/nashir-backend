@@ -132,7 +132,7 @@ npm test
 Route inventory helper:
 
 ```bash
-grep -RIn "nashir-products\|nashir-store-profile\|nashir-campaigns\|readiness\|evidence" src docs tests 2>/dev/null || true
+grep -E -RIn "nashir-products|nashir-store-profile|nashir-campaigns|readiness|evidence" src docs tests 2>/dev/null || true
 ```
 
 Forbidden UI target helper:
