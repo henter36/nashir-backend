@@ -249,6 +249,7 @@ git log --oneline -5
 grep -R "CREATE TABLE IF NOT EXISTS audit_events" -n migrations
 grep -R "audit_events" -n src tests migrations docs || true
 grep -R "AuditRepository" -n src tests docs || true
+```
 ## 16. Output
 
 This gate produces:
