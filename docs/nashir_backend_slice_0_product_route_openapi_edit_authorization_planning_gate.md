@@ -178,6 +178,7 @@ ProductListResponse:
     - products
     - count
     - hasMore
+    - nextCursor
   properties:
     products:
       type: array
