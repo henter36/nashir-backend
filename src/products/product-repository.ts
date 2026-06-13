@@ -77,10 +77,12 @@ export class ProductRepository {
     workspaceId: string;
     input: CreateProductInput;
     productId?: string;
+    db?: PgQueryable;
   }): Promise<Product> {
     const productId = params.productId ?? randomUUID();
+    const db = params.db ?? this.db;
 
-    const result = await this.db.query<ProductRow>(
+    const result = await db.query<ProductRow>(
       `
         INSERT INTO products (
           product_id,
@@ -199,6 +201,7 @@ export class ProductRepository {
     productId: string;
     input: UpdateProductInput;
     expectedVersion?: number;
+    db?: PgQueryable;
   }): Promise<UpdateProductResult> {
     if (!hasUpdateFields(params.input)) {
       throw new Error("At least one product field is required for update");
@@ -260,7 +263,8 @@ export class ProductRepository {
       versionPredicate = `AND version = $${values.length}`;
     }
 
-    const result = await this.db.query<ProductRow>(
+    const db = params.db ?? this.db;
+    const result = await db.query<ProductRow>(
       `
         UPDATE products
         SET
@@ -283,10 +287,17 @@ export class ProductRepository {
       };
     }
 
-    const existingProduct = await this.getProductById({
-      workspaceId: params.workspaceId,
-      productId: params.productId
-    });
+    const existingResult = await db.query<ProductRow>(
+      `
+        SELECT *
+        FROM products
+        WHERE workspace_id = $1
+          AND product_id = $2;
+      `,
+      [params.workspaceId, params.productId]
+    );
+    const existingRow = existingResult.rows[0];
+    const existingProduct = existingRow ? mapProductRow(existingRow) : null;
 
     if (!existingProduct) {
       return {

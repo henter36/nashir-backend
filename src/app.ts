@@ -7,6 +7,7 @@ import Fastify, {
   type FastifyServerOptions
 } from "fastify";
 
+import type { AuditRepository } from "./audit/audit-repository.js";
 import type { AuthConfig } from "./auth-config.js";
 import { createAuthGuardHook, type JwksGetKey } from "./auth-guard.js";
 import { createHttpErrorResponse } from "./error-model.js";
@@ -172,6 +173,7 @@ export interface BuildAppOptions extends FastifyServerOptions {
   workspaceMembershipResolver?: WorkspaceMembershipResolver;
   productRepository?: ProductRepository;
   idempotencyRepository?: IdempotencyRepository;
+  auditRepository?: AuditRepository;
 }
 
 export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
@@ -183,6 +185,7 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     workspaceMembershipResolver,
     productRepository,
     idempotencyRepository,
+    auditRepository,
     ...fastifyOpts
   } = opts;
   const app = Fastify({ logger: true, ...fastifyOpts });
@@ -294,10 +297,11 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     );
   }
 
-  if (productRepository && idempotencyRepository) {
+  if (productRepository && idempotencyRepository && auditRepository) {
     app.register(productPlugin, {
       productRepository,
       idempotencyRepository,
+      auditRepository,
       workspaceContextGuardHook
     });
   }

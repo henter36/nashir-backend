@@ -5,6 +5,7 @@ import type {
   FastifyRequest
 } from "fastify";
 
+import type { AuditRepository } from "../audit/audit-repository.js";
 import type { IdempotencyRepository } from "../idempotency/idempotency-repository.js";
 import type { ProductRepository } from "./product-repository.js";
 import {
@@ -25,6 +26,7 @@ const PRODUCT_ITEM_ROUTE = "/workspaces/:workspaceId/products/:productId";
 export interface ProductPluginOptions {
   productRepository: ProductRepository;
   idempotencyRepository: IdempotencyRepository;
+  auditRepository: AuditRepository;
   workspaceContextGuardHook?:
     | ((request: FastifyRequest, reply: FastifyReply) => Promise<void>)
     | null;
@@ -38,6 +40,7 @@ export const productPlugin: FastifyPluginAsync<ProductPluginOptions> =
     const {
       productRepository,
       idempotencyRepository,
+      auditRepository,
       workspaceContextGuardHook
     } = opts;
 
@@ -62,7 +65,11 @@ export const productPlugin: FastifyPluginAsync<ProductPluginOptions> =
     }>(
       PRODUCTS_ROUTE,
       routeOpts,
-      createCreateProductHandler({ productRepository, idempotencyRepository })
+      createCreateProductHandler({
+        productRepository,
+        idempotencyRepository,
+        auditRepository
+      })
     );
 
     fastify.get<{ Params: ProductItemRouteParams }>(
@@ -77,6 +84,6 @@ export const productPlugin: FastifyPluginAsync<ProductPluginOptions> =
     }>(
       PRODUCT_ITEM_ROUTE,
       routeOpts,
-      createUpdateProductHandler({ productRepository })
+      createUpdateProductHandler({ productRepository, auditRepository })
     );
   };

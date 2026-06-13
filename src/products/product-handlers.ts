@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { FastifyReply, FastifyRequest } from "fastify";
 
+import type { AuditRepository } from "../audit/audit-repository.js";
 import { createHttpErrorResponse } from "../error-model.js";
 import { evaluatePermissionGuard } from "../permission-guard.js";
 import type { IdempotencyRepository } from "../idempotency/idempotency-repository.js";
@@ -477,6 +478,7 @@ export function createListProductsHandler(deps: {
 export function createCreateProductHandler(deps: {
   productRepository: ProductRepository;
   idempotencyRepository: IdempotencyRepository;
+  auditRepository: AuditRepository;
 }) {
   return async function createProductHandler(
     request: FastifyRequest<{
@@ -580,9 +582,30 @@ export function createCreateProductHandler(deps: {
 
     let product;
     try {
-      product = await deps.productRepository.createProduct({
-        workspaceId: ctx.workspaceId,
-        input: validation.input
+      product = await deps.auditRepository.withTransaction(async (db) => {
+        const createdProduct = await deps.productRepository.createProduct({
+          workspaceId: ctx.workspaceId,
+          input: validation.input,
+          db
+        });
+        await deps.auditRepository.createAuditEvent(
+          {
+            workspaceId: ctx.workspaceId,
+            actorId: ctx.actorId,
+            action: "product.created",
+            resourceType: "product",
+            resourceId: createdProduct.productId,
+            correlationId: request.correlationId,
+            afterState: {
+              productId: createdProduct.productId,
+              status: createdProduct.status,
+              idempotencyKey: trimmedKey,
+              version: createdProduct.version
+            }
+          },
+          db
+        );
+        return createdProduct;
       });
     } catch (err) {
       await deps.idempotencyRepository
@@ -637,6 +660,7 @@ export function createGetProductHandler(deps: {
 
 export function createUpdateProductHandler(deps: {
   productRepository: ProductRepository;
+  auditRepository: AuditRepository;
 }) {
   return async function updateProductHandler(
     request: FastifyRequest<{
@@ -728,11 +752,37 @@ export function createUpdateProductHandler(deps: {
       return;
     }
 
-    const result = await deps.productRepository.updateProduct({
-      workspaceId: ctx.workspaceId,
-      productId: request.params.productId,
-      input: validation.input,
-      expectedVersion
+    const result = await deps.auditRepository.withTransaction(async (db) => {
+      const updateResult = await deps.productRepository.updateProduct({
+        workspaceId: ctx.workspaceId,
+        productId: request.params.productId,
+        input: validation.input,
+        expectedVersion,
+        db
+      });
+      if (updateResult.status === "updated") {
+        await deps.auditRepository.createAuditEvent(
+          {
+            workspaceId: ctx.workspaceId,
+            actorId: ctx.actorId,
+            action: "product.updated",
+            resourceType: "product",
+            resourceId: updateResult.product.productId,
+            correlationId: request.correlationId,
+            beforeState: {
+              productId: updateResult.product.productId,
+              previousVersion: expectedVersion
+            },
+            afterState: {
+              productId: updateResult.product.productId,
+              newVersion: updateResult.product.version,
+              changedFields: Object.keys(validation.input)
+            }
+          },
+          db
+        );
+      }
+      return updateResult;
     });
 
     if (result.status === "not_found") {
