@@ -796,8 +796,9 @@ ProductListResponse:
     hasMore:
       type: boolean
     nextCursor:
-      type: string
-      nullable: true
+      type:
+        - string
+        - "null"
 ```
 
 Rationale:
