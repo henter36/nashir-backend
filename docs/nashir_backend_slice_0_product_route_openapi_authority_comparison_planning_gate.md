@@ -219,7 +219,7 @@ Required comparison:
 | :--- | :--- | :--- | :--- |
 | Create product | Requires `name`; rejects `workspaceId` / `workspace_id`; validates product fields | To be inspected | Pending |
 | Update product | Requires at least one updatable field; rejects `workspaceId` / `workspace_id`; validates product fields | To be inspected | Pending |
-| List product | No body | To be inspected | Pending |
+| List products | No body | To be inspected | Pending |
 | Get product | No body | To be inspected | Pending |
 
 ### 9.5 Response Bodies
@@ -246,6 +246,18 @@ Required comparison:
 | Idempotent create | Implemented | To be inspected | Pending |
 | Optimistic update | Implemented | To be inspected | Pending |
 | Audit side effects | Create/update only; not response payload | To be inspected | Pending |
+
+### 9.7 ErrorModel
+
+Required comparison:
+
+| ErrorModel Field | Runtime Boundary | OpenAPI | Decision |
+| :--- | :--- | :--- | :--- |
+| `code` | Produced by runtime error response helper | To be inspected | Pending |
+| `message` | Produced by runtime error response helper | To be inspected | Pending |
+| `statusCode` | Produced by runtime error response helper | To be inspected | Pending |
+| `correlationId` | Included when available from request correlation boundary | To be inspected | Pending |
+| `details` | Included only when supplied by runtime error path | To be inspected | Pending |
 
 ## 10. Planned Drift Categories
 
