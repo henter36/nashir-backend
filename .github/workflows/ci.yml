@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: henter36/nashir
-          ref: 36da9ed31903562bddfb7ffd669841956e334a51
+          ref: 13388d787f57e2d863eda960db6de497bd2efa6c
           path: nashir-authority
           persist-credentials: false
 
@@ -65,7 +65,7 @@ jobs:
         run: |
           pnpm run validate:contract-authority -- \
             --authority-repo ../nashir-authority \
-            --authority-ref 36da9ed31903562bddfb7ffd669841956e334a51
+            --authority-ref 13388d787f57e2d863eda960db6de497bd2efa6c
 
       - name: Lint
         working-directory: nashir-backend
