@@ -138,12 +138,12 @@ FINDING: current runtime uses /products, not /nashir-products.
 |---|---:|---|
 | Runtime product routes | Implemented | Four product routes are registered by `productPlugin`. |
 | Runtime route naming | Gap | Runtime uses `/products`; planning docs referenced `/nashir-products`. |
-| OpenAPI authority alignment | Unresolved in this review | Must be checked in a later decision gate before any route rename or OpenAPI edit. |
-| Generated types alignment | Unresolved in this review | Must be checked after OpenAPI authority decision. |
-| Permission guard | Present in route-handler planning chain, but must be verified route-by-route in next decision gate | Do not assume complete UI-consumer permission coverage from this review alone. |
-| Workspace boundary | Product plugin receives `workspaceContextGuardHook`; route-level behavior must remain verified by tests | Keep as required V1 boundary. |
-| Idempotency | Required for create path; repository dependency gates route registration | Preserve for write routes. |
-| Audit | Required for create/update path; repository dependency gates route registration | Preserve for mutation routes. |
+| OpenAPI authority alignment | Unresolved | Must be checked in a later decision gate before any route rename or OpenAPI edit. |
+| Generated types alignment | Unresolved | Must be checked after OpenAPI authority decision. |
+| Permission guard | Present | Present in route-handler planning chain, but must be verified route-by-route in next decision gate. Do not assume complete UI-consumer permission coverage from this review alone. |
+| Workspace boundary | Present | Product plugin receives `workspaceContextGuardHook`; route-level behavior must remain verified by tests. Keep as required V1 boundary. |
+| Idempotency | Required | Required for create path; repository dependency gates route registration. Preserve for write routes. |
+| Audit | Required | Required for create/update path; repository dependency gates route registration. Preserve for mutation routes. |
 
 ---
 
