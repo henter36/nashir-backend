@@ -59,6 +59,13 @@ Runtime files reviewed by this gate:
 - `src/workspace-context.ts`
 - `tests/products/product-route-handler.test.ts`
 
+Review basis:
+
+- `src/error-model.ts` is reviewed only as the runtime ErrorModel response boundary used by product route handlers.
+- `src/permission-guard.ts` is reviewed only as the runtime permission decision boundary used by product route handlers.
+- These files are not changed by this gate.
+- This gate does not authorize edits to either file.
+
 ### 4.4 Accepted Runtime Foundation
 
 The following runtime foundation was accepted before this gate:
