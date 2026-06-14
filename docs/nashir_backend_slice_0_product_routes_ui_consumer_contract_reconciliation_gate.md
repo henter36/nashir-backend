@@ -67,8 +67,8 @@ This does not remove the remaining approved screens from V1; it only narrows thi
 Expected route families to inventory:
 
 ```text
-/workspaces/{workspaceId}/nashir-products
-/workspaces/{workspaceId}/nashir-products/{productId}
+/workspaces/{workspaceId}/products
+/workspaces/{workspaceId}/products/{productId}
 /workspaces/{workspaceId}/nashir-store-profile
 /workspaces/{workspaceId}/nashir-campaigns
 /workspaces/{workspaceId}/nashir-campaigns/{nashirCampaignId}
@@ -132,7 +132,7 @@ npm test
 Route inventory helper:
 
 ```bash
-grep -E -RIn "nashir-products|nashir-store-profile|nashir-campaigns|readiness|evidence" src docs tests 2>/dev/null || true
+grep -E -RIn "/products|nashir-store-profile|nashir-campaigns|readiness|evidence" src docs tests 2>/dev/null || true
 ```
 
 Forbidden UI target helper:

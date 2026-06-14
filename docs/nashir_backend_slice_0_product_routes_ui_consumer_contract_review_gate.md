@@ -96,7 +96,7 @@ Interpretation:
 
 ```text
 PASS: product runtime routes exist.
-FINDING: current runtime uses /products, not /nashir-products.
+FINDING: current runtime uses canonical /products; /nashir-products is non-canonical stale planning terminology.
 ```
 
 ---
@@ -105,9 +105,9 @@ FINDING: current runtime uses /products, not /nashir-products.
 
 | Route family | Runtime status | Evidence | UI consumer candidate | Review finding |
 |---|---:|---|---|---|
-| `/workspaces/:workspaceId/products` | Implemented | `src/products/product-route.ts` | `productCatalog`, `storeSetup`, `productIntelligence`, `creatorStudio` | Runtime exists under `/products`, not `/nashir-products`. |
-| `/workspaces/:workspaceId/products/:productId` | Implemented | `src/products/product-route.ts` | `productCatalog`, `productIntelligence`, `creatorStudio`, `contentReview` | Runtime exists under `/products/:productId`, not `/nashir-products/{productId}`. |
-| `/workspaces/{workspaceId}/nashir-products` | Not observed in runtime | Planning docs only | Same product UI consumers | Naming/alignment gap. Requires decision gate before edits. |
+| `/workspaces/:workspaceId/products` | Implemented | `src/products/product-route.ts` | `productCatalog`, `storeSetup`, `productIntelligence`, `creatorStudio` | Canonical V1 product collection route. |
+| `/workspaces/:workspaceId/products/:productId` | Implemented | `src/products/product-route.ts` | `productCatalog`, `productIntelligence`, `creatorStudio`, `contentReview` | Canonical V1 product item route. |
+| `/workspaces/{workspaceId}/nashir-products` | Not observed in runtime | Stale planning terminology only | None | Non-canonical; rejected by the Product Route Naming / Authority Alignment Decision Gate. |
 | `/workspaces/{workspaceId}/nashir-store-profile` | Not observed in runtime from current review evidence | Planning docs only | `storeSetup`, `settings` | Defer; do not implement in this review. |
 | `/workspaces/{workspaceId}/nashir-campaigns` | Not observed in runtime from current review evidence | Planning docs only | `campaigns`, `campaignsList`, `creatorStudio`, `publishingQueue`, `analytics` | Defer; do not implement in this review. |
 | `/workspaces/{workspaceId}/nashir-campaigns/{id}/readiness` | Not observed in runtime from current review evidence | Planning docs only | `productIntelligence`, `creatorStudio`, `contentReview` | Defer; readiness remains outside current product runtime. |
@@ -119,7 +119,7 @@ FINDING: current runtime uses /products, not /nashir-products.
 
 | UI screen | Runtime route currently usable | Gap |
 |---|---|---|
-| `productCatalog` | `/workspaces/:workspaceId/products`, `/workspaces/:workspaceId/products/:productId` | Need confirm UI contract expects `/products` or `/nashir-products`. |
+| `productCatalog` | `/workspaces/:workspaceId/products`, `/workspaces/:workspaceId/products/:productId` | `/products` is the canonical V1 route family; `/nashir-products` is non-canonical. |
 | `storeSetup` | Product routes may support product setup only | Store profile route not observed in runtime evidence. |
 | `productIntelligence` | Product read/list may support inventory context | Readiness/intelligence routes are not authorized here. |
 | `creatorStudio` | Product read/list may support product selection | Campaign/content generation routes deferred. |
@@ -137,9 +137,9 @@ FINDING: current runtime uses /products, not /nashir-products.
 | Area | Status | Finding |
 |---|---:|---|
 | Runtime product routes | Implemented | Four product routes are registered by `productPlugin`. |
-| Runtime route naming | Gap | Runtime uses `/products`; planning docs referenced `/nashir-products`. |
-| OpenAPI authority alignment | Unresolved | Must be checked in a later decision gate before any route rename or OpenAPI edit. |
-| Generated types alignment | Unresolved | Must be checked after OpenAPI authority decision. |
+| Runtime route naming | Resolved | Runtime and authority OpenAPI use canonical `/products`; `/nashir-products` is non-canonical stale planning terminology. |
+| OpenAPI authority alignment | Resolved | Authority OpenAPI and runtime align on `/products`; no route rename or OpenAPI edit is authorized. |
+| Generated types alignment | No change required by naming decision | The naming decision does not authorize generated type regeneration. |
 | Permission guard | Present | Present in route-handler planning chain, but must be verified route-by-route in next decision gate. Do not assume complete UI-consumer permission coverage from this review alone. |
 | Workspace boundary | Present | Product plugin receives `workspaceContextGuardHook`; route-level behavior must remain verified by tests. Keep as required V1 boundary. |
 | Idempotency | Required | Required for create path; repository dependency gates route registration. Preserve for write routes. |
@@ -151,9 +151,9 @@ FINDING: current runtime uses /products, not /nashir-products.
 
 | Risk | Severity | Decision |
 |---|---:|---|
-| Treating `/nashir-products` as implemented when runtime actually uses `/products` | HIGH | Must be corrected by a later contract decision gate. |
+| Treating `/nashir-products` as implemented when runtime actually uses `/products` | HIGH | Rejected; `/nashir-products` is non-canonical stale planning terminology. |
 | Renaming runtime routes without OpenAPI/generated/UI decision | HIGH | NO-GO. |
-| Editing OpenAPI before deciding whether authority should use `/products` or `/nashir-products` | HIGH | NO-GO. |
+| Editing OpenAPI to use non-canonical `/nashir-products` | HIGH | NO-GO. |
 | Expanding into campaign/store/readiness/evidence runtime routes from this review | HIGH | NO-GO. |
 | Confusing valid backend API routes with static `/nashir` Product UI serving | MEDIUM | Keep distinction explicit. |
 
@@ -170,7 +170,7 @@ NO-GO: UI changes in this review.
 NO-GO: Static /nashir or /nashir/ Product UI serving.
 NO-GO: Reintroducing marketing-os/ui/nashir as a UI consumer.
 NO-GO: Adding store profile, campaign, readiness, evidence, publishing, analytics, or agents runtime routes from this review.
-NO-GO: Renaming /products to /nashir-products without a dedicated route naming authority decision.
+NO-GO: Renaming canonical /products to non-canonical /nashir-products.
 ```
 
 ---
@@ -192,10 +192,7 @@ Backend Slice 0 Product Route Naming / Authority Alignment Decision Gate
 
 Purpose:
 
-- Decide whether V1 backend authority should preserve `/workspaces/{workspaceId}/products` or move toward `/workspaces/{workspaceId}/nashir-products`.
-- Compare runtime, OpenAPI authority, generated types, and approved `henter36/nashir` UI expectations.
-- Choose the next narrow action:
-  - accept `/products` as canonical;
-  - authorize an OpenAPI authority edit;
-  - authorize a runtime route rename/alias plan;
-  - or defer route naming changes.
+- Record the resolved decision that V1 backend authority preserves `/workspaces/{workspaceId}/products` and rejects `/workspaces/{workspaceId}/nashir-products` as canonical.
+- Preserve the comparison of runtime, OpenAPI authority, generated types, and approved `henter36/nashir` UI expectations as historical review context.
+- Preserve the selected narrow action: accept `/products` as canonical and keep
+  runtime, OpenAPI, and generated types unchanged.
