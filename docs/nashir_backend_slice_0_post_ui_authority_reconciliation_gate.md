@@ -66,8 +66,8 @@ Valid Nashir backend API routes remain valid when they serve the approved Produc
 Examples of valid backend/API concepts:
 
 ```text
-/workspaces/{workspaceId}/nashir-products
-/workspaces/{workspaceId}/nashir-products/{productId}
+/workspaces/{workspaceId}/products
+/workspaces/{workspaceId}/products/{productId}
 /workspaces/{workspaceId}/nashir-store-profile
 ```
 
@@ -143,7 +143,7 @@ No static Product UI route or marketing-os UI target.
 ### Valid API route preservation scan
 
 ```bash
-grep -RIn "nashir-products\|nashir-store-profile\|nashir-campaigns" src docs tests 2>/dev/null || true
+grep -RIn "/products\|nashir-store-profile\|nashir-campaigns" src docs tests 2>/dev/null || true
 ```
 
 Expected result:
