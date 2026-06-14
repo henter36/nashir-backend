@@ -131,6 +131,6 @@ Backend Slice 0 Product Route Runtime Contract Acceptance Review Gate
 Purpose:
 
 * Confirm the already implemented product runtime routes match the accepted OpenAPI/generated contract.
-* Review `GET/POST /workspaces/:workspaceId/products` and `GET/PUT /workspaces/:workspaceId/products/:productId`.
+* Review `GET/POST /workspaces/{workspaceId}/products` and `GET/PUT /workspaces/{workspaceId}/products/{productId}`.
 * Verify permission, workspace, idempotency, audit, and response-shape alignment.
 * Decide whether product routes are ready to become the first UI-consumable backend slice for `henter36/nashir`.
