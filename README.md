@@ -4,7 +4,10 @@ This repository is the private backend repository for Nashir.
 
 ## Governance Status
 
-This repository currently contains a minimal runtime skeleton only.
+This repository contains the Nashir backend runtime foundation. The canonical
+`/workspaces/{workspaceId}/products` route family is accepted as a
+contract-aligned backend slice candidate for Product Catalog UI consumption
+planning; UI integration and production readiness remain blocked.
 
 The selected setup stack is TypeScript, Node.js LTS, Fastify, pnpm, Zod,
 PostgreSQL, and node-postgres / pg. The `pg` package is declared only; no
@@ -13,9 +16,10 @@ database connection is created or executed.
 The `/health` endpoint is an infrastructure smoke check only. It is not a
 product, business, or workspace-scoped API route.
 
-No product API routes, controllers, services, repositories, SQL migrations,
-migration runner, ORM/query layer, auth implementation, generated clients,
-deployment configuration, or CI workflows are authorized.
+No changes to the accepted product routes, additional business route families,
+SQL/migrations, auth/runtime behavior, generated clients, deployment
+configuration, or CI workflows are authorized by the current Product Catalog
+integration planning gate.
 
 Generated clients remain blocked until a later explicit generated-client gate.
 
