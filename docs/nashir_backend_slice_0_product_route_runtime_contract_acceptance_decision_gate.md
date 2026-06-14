@@ -117,7 +117,7 @@ NO-GO: Production or pilot readiness.
 npm test
 npm run typecheck
 npm run lint
-NASHIR_AUTHORITY_REPO=/Users/mohammedalqudairi/workspace/nashir npm run validate:contracts
+NASHIR_AUTHORITY_REPO=../nashir npm run validate:contracts
 git diff --check
 ```
 
