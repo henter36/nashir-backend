@@ -71,7 +71,7 @@ Implementation remains blocked.
 
 | UI intent | Accepted route | Contract shape | Backend boundary |
 |---|---|---|---|
-| Load catalog | `GET /workspaces/{workspaceId}/products` | `ProductListResponse` | Requires `limit`; supports cursor, status, updated-after, and sort. |
+| Load catalog | `GET /workspaces/{workspaceId}/products` | `ProductListResponse` | Requires `limit`; supports cursor, status, updatedAfter, and sort. |
 | Add product metadata | `POST /workspaces/{workspaceId}/products` | `ProductResponse` | Requires manage permission and `Idempotency-Key`. |
 | Load one product | `GET /workspaces/{workspaceId}/products/{productId}` | `ProductResponse` | Uses canonical `productId`. |
 | Update product metadata | `PUT /workspaces/{workspaceId}/products/{productId}` | `ProductResponse` | Requires manage permission and optimistic-concurrency version header. |
