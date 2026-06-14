@@ -188,4 +188,5 @@ Purpose:
 * Define request field allowlists and UI-only-field treatment.
 * Define create idempotency and update concurrency behavior.
 * Preserve disabled/unwired delete and store-pull actions.
+* Preserve non-disclosing handling for auth, permission, workspace, and not-found responses.
 * Decide whether a narrow Product Catalog UI Adapter Implementation Authorization Gate may proceed.
