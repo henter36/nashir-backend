@@ -143,7 +143,7 @@ No static Product UI route or marketing-os UI target.
 ### Valid API route preservation scan
 
 ```bash
-grep -RIn "/products\|nashir-store-profile\|nashir-campaigns" src docs tests 2>/dev/null || true
+grep -E -RIn "/products|nashir-store-profile|nashir-campaigns" src docs tests 2>/dev/null || true
 ```
 
 Expected result:
