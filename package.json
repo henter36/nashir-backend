@@ -32,6 +32,7 @@
     "@types/node": "^22.15.32",
     "@types/pg": "^8.15.4",
     "eslint": "^9.29.0",
+    "js-yaml": "^4.2.0",
     "prettier": "^3.5.3",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",

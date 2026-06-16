@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import yaml from "js-yaml";
+
 import { buildApp } from "../src/app.ts";
 import { toPublicProduct } from "../src/products/product-schema.ts";
 import {
@@ -39,22 +41,10 @@ const NULLABLE_PRODUCT_REQUEST_FIELDS = [
   "description"
 ];
 const IMPLEMENTED_PUBLIC_PRODUCT_ROUTES = [
-  {
-    method: "get",
-    path: "/workspaces/{workspaceId}/products"
-  },
-  {
-    method: "post",
-    path: "/workspaces/{workspaceId}/products"
-  },
-  {
-    method: "get",
-    path: "/workspaces/{workspaceId}/products/{productId}"
-  },
-  {
-    method: "put",
-    path: "/workspaces/{workspaceId}/products/{productId}"
-  }
+  ["get", "/workspaces/{workspaceId}/products"],
+  ["post", "/workspaces/{workspaceId}/products"],
+  ["get", "/workspaces/{workspaceId}/products/{productId}"],
+  ["put", "/workspaces/{workspaceId}/products/{productId}"]
 ];
 
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -74,6 +64,10 @@ function parseArguments(argv) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
+
+    if (argument === "--") {
+      continue;
+    }
 
     if (argument !== "--authority-repo") {
       throw new Error(`Unknown argument: ${argument}`);
@@ -97,68 +91,59 @@ function parseArguments(argv) {
   return { authorityRepo };
 }
 
-function countIndent(line) {
-  return line.match(/^ */)?.[0].length ?? 0;
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function extractBlock(lines, key, indent) {
-  const start = lines.findIndex(
-    (line) => line === `${" ".repeat(indent)}${key}:`
-  );
-  if (start === -1) return null;
+function asRecord(value, label) {
+  if (isRecord(value)) return value;
+  fail(`${label} is missing or not an object`);
+  return null;
+}
 
-  const block = [];
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line.trim().length === 0) {
-      block.push(line);
-      continue;
+function hasRequiredField(schema, field) {
+  return Array.isArray(schema.required) && schema.required.includes(field);
+}
+
+function declaresType(schema, expectedType) {
+  if (schema.type === expectedType) return true;
+  return Array.isArray(schema.type) && schema.type.includes(expectedType);
+}
+
+function supportsNull(schema, seen = new Set()) {
+  if (!isRecord(schema) || seen.has(schema)) return false;
+  seen.add(schema);
+
+  if (schema.nullable === true) return true;
+  if (declaresType(schema, "null")) return true;
+
+  for (const compositionKey of ["anyOf", "oneOf", "allOf"]) {
+    const variants = schema[compositionKey];
+    if (
+      Array.isArray(variants) &&
+      variants.some((variant) => supportsNull(variant, seen))
+    ) {
+      return true;
     }
-
-    if (countIndent(line) <= indent) break;
-    block.push(line);
   }
 
-  return block;
+  return false;
 }
 
-function blockHasKey(block, key, indent) {
-  return block.some((line) => line === `${" ".repeat(indent)}${key}:`);
+function getSchemas(openapi) {
+  return asRecord(openapi.components?.schemas, "OpenAPI components.schemas");
 }
 
-function extractListValues(block) {
-  return block
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("- "))
-    .map((line) => line.slice(2).replace(/^"|"$/g, ""));
-}
-
-function blockDeclaresType(block, expectedType) {
-  const inlineType = block.find(
-    (line) => line.trim() === `type: ${expectedType}`
+function getResponses(openapi) {
+  return asRecord(
+    openapi.components?.responses,
+    "OpenAPI components.responses"
   );
-  if (inlineType) return true;
-
-  return extractListValues(block).includes(expectedType);
 }
 
-function findPropertyBlock(schemaBlock, propertyName) {
-  const propertiesBlock = extractBlock(schemaBlock, "properties", 6);
-  if (!propertiesBlock) return null;
-
-  return extractBlock(propertiesBlock, propertyName, 8);
-}
-
-function checkSchemaRequiredFields(schemaBlock, schemaName, fields) {
-  const requiredBlock = extractBlock(schemaBlock, "required", 6);
-  if (!requiredBlock) {
-    fail(`${schemaName} schema is missing required list`);
-    return;
-  }
-
-  const required = new Set(extractListValues(requiredBlock));
+function checkRequiredFields(schema, schemaName, fields) {
   for (const field of fields) {
-    if (required.has(field)) {
+    if (hasRequiredField(schema, field)) {
       pass(`${schemaName} requires ${field}`);
     } else {
       fail(`${schemaName} does not require ${field}`);
@@ -166,29 +151,22 @@ function checkSchemaRequiredFields(schemaBlock, schemaName, fields) {
   }
 }
 
-function checkHealthSchema(schemasBlock) {
-  const healthSchema = extractBlock(schemasBlock, "HealthResponse", 4);
-  if (!healthSchema) {
-    fail("HealthResponse schema is missing");
-    return;
-  }
-
+function checkHealthSchema(schemas) {
+  const healthSchema = asRecord(
+    schemas.HealthResponse,
+    "HealthResponse schema"
+  );
+  if (!healthSchema) return;
   pass("HealthResponse schema exists");
-  const dataBlock = findPropertyBlock(healthSchema, "data");
-  if (!dataBlock) {
-    fail("HealthResponse.data property is missing");
-    return;
-  }
 
-  const dataRequiredBlock = extractBlock(dataBlock, "required", 10);
-  if (!dataRequiredBlock) {
-    fail("HealthResponse.data required list is missing");
-    return;
-  }
+  const data = asRecord(
+    healthSchema.properties?.data,
+    "HealthResponse.data property"
+  );
+  if (!data) return;
 
-  const dataRequired = new Set(extractListValues(dataRequiredBlock));
   for (const field of REQUIRED_HEALTH_DATA_FIELDS) {
-    if (dataRequired.has(field)) {
+    if (hasRequiredField(data, field)) {
       pass(`HealthResponse.data requires ${field}`);
     } else {
       fail(`HealthResponse.data does not require ${field}`);
@@ -196,79 +174,75 @@ function checkHealthSchema(schemasBlock) {
   }
 }
 
-function checkErrorSchemas(schemasBlock) {
-  const errorModel = extractBlock(schemasBlock, "ErrorModel", 4);
-  if (!errorModel) {
-    fail("ErrorModel schema is missing");
-  } else {
+function checkErrorSchemas(schemas, responses) {
+  const errorModel = asRecord(schemas.ErrorModel, "ErrorModel schema");
+  if (errorModel) {
     pass("ErrorModel schema exists");
-    checkSchemaRequiredFields(
-      errorModel,
-      "ErrorModel",
-      REQUIRED_ERROR_MODEL_FIELDS
+    checkRequiredFields(errorModel, "ErrorModel", REQUIRED_ERROR_MODEL_FIELDS);
+  }
+
+  const errorCode = asRecord(schemas.ErrorCode, "ErrorCode schema");
+  if (errorCode) {
+    pass("ErrorCode schema exists");
+    const enumValues = new Set(
+      Array.isArray(errorCode.enum) ? errorCode.enum : []
     );
-  }
-
-  const errorCode = extractBlock(schemasBlock, "ErrorCode", 4);
-  if (!errorCode) {
-    fail("ErrorCode schema is missing");
-    return;
-  }
-
-  pass("ErrorCode schema exists");
-  const enumBlock = extractBlock(errorCode, "enum", 6);
-  if (!enumBlock) {
-    fail("ErrorCode enum is missing");
-    return;
-  }
-
-  const enumValues = new Set(extractListValues(enumBlock));
-  for (const value of REQUIRED_ERROR_CODES) {
-    if (enumValues.has(value)) {
-      pass(`ErrorCode enum contains ${value}`);
-    } else {
-      fail(`ErrorCode enum is missing ${value}`);
+    for (const value of REQUIRED_ERROR_CODES) {
+      if (enumValues.has(value)) {
+        pass(`ErrorCode enum contains ${value}`);
+      } else {
+        fail(`ErrorCode enum is missing ${value}`);
+      }
     }
+  }
+
+  const defaultErrorRef =
+    responses.DefaultError?.content?.["application/json"]?.schema?.$ref;
+  if (defaultErrorRef === "#/components/schemas/ErrorModel") {
+    pass("DefaultError response references ErrorModel");
+  } else {
+    fail("DefaultError response does not reference ErrorModel");
   }
 }
 
-function checkProductSchema(schemasBlock) {
-  const product = extractBlock(schemasBlock, "Product", 4);
-  if (!product) {
-    fail("Product schema is missing");
-    return;
-  }
-
+function checkProductSchema(schemas) {
+  const product = asRecord(schemas.Product, "Product schema");
+  if (!product) return;
   pass("Product schema exists");
-  const versionBlock = findPropertyBlock(product, "version");
-  if (!versionBlock) {
-    fail("Product.version property is missing");
-    return;
-  }
 
-  if (blockDeclaresType(versionBlock, "string")) {
+  const version = asRecord(
+    product.properties?.version,
+    "Product.version property"
+  );
+  if (!version) return;
+
+  if (declaresType(version, "string")) {
     pass("Product.version is string in OpenAPI");
   } else {
     fail("Product.version is not string in OpenAPI");
   }
+
+  const productResponseRef = schemas.ProductResponse?.properties?.product?.$ref;
+  if (productResponseRef === "#/components/schemas/Product") {
+    pass("ProductResponse.product references Product");
+  } else {
+    fail("ProductResponse.product does not reference Product");
+  }
 }
 
-function checkRequestNullability(schemasBlock, schemaName) {
-  const schema = extractBlock(schemasBlock, schemaName, 4);
-  if (!schema) {
-    fail(`${schemaName} schema is missing`);
-    return;
-  }
-
+function checkRequestNullability(schemas, schemaName) {
+  const schema = asRecord(schemas[schemaName], `${schemaName} schema`);
+  if (!schema) return;
   pass(`${schemaName} schema exists`);
-  for (const field of NULLABLE_PRODUCT_REQUEST_FIELDS) {
-    const propertyBlock = findPropertyBlock(schema, field);
-    if (!propertyBlock) {
-      fail(`${schemaName}.${field} property is missing`);
-      continue;
-    }
 
-    if (blockDeclaresType(propertyBlock, "null")) {
+  for (const field of NULLABLE_PRODUCT_REQUEST_FIELDS) {
+    const property = asRecord(
+      schema.properties?.[field],
+      `${schemaName}.${field} property`
+    );
+    if (!property) continue;
+
+    if (supportsNull(property)) {
       pass(`${schemaName}.${field} allows null`);
     } else {
       fail(`${schemaName}.${field} does not allow null`);
@@ -276,34 +250,42 @@ function checkRequestNullability(schemasBlock, schemaName) {
   }
 }
 
-function checkImplementedProductPaths(pathsBlock) {
-  for (const route of IMPLEMENTED_PUBLIC_PRODUCT_ROUTES) {
-    const pathBlock = extractBlock(pathsBlock, route.path, 2);
-    if (!pathBlock) {
-      fail(`OpenAPI path is missing: ${route.path}`);
-      continue;
-    }
+function checkImplementedProductPaths(openapi) {
+  const paths = asRecord(openapi.paths, "OpenAPI paths");
+  if (!paths) return;
 
-    pass(`OpenAPI path exists: ${route.path}`);
-    if (blockHasKey(pathBlock, route.method, 4)) {
-      pass(
-        `OpenAPI operation exists: ${route.method.toUpperCase()} ${route.path}`
-      );
+  if (paths["/health"]) {
+    pass("OpenAPI path exists: /health");
+  } else {
+    fail("OpenAPI path is missing: /health");
+  }
+
+  for (const [method, path] of IMPLEMENTED_PUBLIC_PRODUCT_ROUTES) {
+    const pathItem = asRecord(paths[path], `OpenAPI path ${path}`);
+    if (!pathItem) continue;
+    pass(`OpenAPI path exists: ${path}`);
+
+    if (isRecord(pathItem[method])) {
+      pass(`OpenAPI operation exists: ${method.toUpperCase()} ${path}`);
     } else {
-      fail(
-        `OpenAPI operation is missing: ${route.method.toUpperCase()} ${route.path}`
-      );
+      fail(`OpenAPI operation is missing: ${method.toUpperCase()} ${path}`);
     }
   }
 }
 
 function assertObject(value, label) {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    fail(`${label} is not an object`);
+  if (isRecord(value)) return value;
+  fail(`${label} is not an object`);
+  return null;
+}
+
+function parseJsonResponse(response, label) {
+  try {
+    return response.json();
+  } catch {
+    fail(`${label} response payload is not valid JSON`);
     return null;
   }
-
-  return value;
 }
 
 function checkRuntimeHealthShape(body) {
@@ -403,10 +385,11 @@ async function checkRuntimeResponses() {
     });
     if (healthResponse.statusCode === 200) {
       pass("/health returns HTTP 200");
+      const body = parseJsonResponse(healthResponse, "/health");
+      if (body) checkRuntimeHealthShape(body);
     } else {
       fail(`/health returned HTTP ${healthResponse.statusCode}; expected 200`);
     }
-    checkRuntimeHealthShape(healthResponse.json());
 
     const errorResponse = await app.inject({
       method: "GET",
@@ -418,76 +401,77 @@ async function checkRuntimeResponses() {
     });
     if (errorResponse.statusCode === 404) {
       pass("safe missing route returns HTTP 404");
+      const body = parseJsonResponse(errorResponse, "safe missing route");
+      if (body) checkRuntimeErrorShape(body);
     } else {
       fail(
         `safe missing route returned HTTP ${errorResponse.statusCode}; expected 404`
       );
     }
-    checkRuntimeErrorShape(errorResponse.json());
   } finally {
     await app.close();
   }
 }
 
-let options;
-
-try {
-  options = parseArguments(process.argv.slice(2));
-} catch (error) {
-  fail(error.message);
-}
-
-if (options) {
-  const authorityRepo = resolve(backendRepo, options.authorityRepo);
+function loadOpenApi(authorityRepo) {
   const openApiPath = resolve(authorityRepo, OPENAPI_RELATIVE_PATH);
 
   if (!existsSync(authorityRepo) || !statSync(authorityRepo).isDirectory()) {
     fail(
       `Authority repository path is not a local directory: ${authorityRepo}`
     );
-  } else if (!existsSync(openApiPath) || !statSync(openApiPath).isFile()) {
+    return null;
+  }
+
+  if (!existsSync(openApiPath) || !statSync(openApiPath).isFile()) {
     fail(`OpenAPI file is missing: ${openApiPath}`);
-  } else {
-    pass(`OpenAPI file found: ${openApiPath}`);
-    const lines = readFileSync(openApiPath, "utf8").split(/\r?\n/);
-    const pathsBlock = extractBlock(lines, "paths", 0);
-    const componentsBlock = extractBlock(lines, "components", 0);
-    const schemasBlock = componentsBlock
-      ? extractBlock(componentsBlock, "schemas", 2)
-      : null;
+    return null;
+  }
 
-    if (!pathsBlock) {
-      fail("OpenAPI paths block is missing");
-    } else {
-      const healthPath = extractBlock(pathsBlock, "/health", 2);
-      if (healthPath) {
-        pass("OpenAPI path exists: /health");
-      } else {
-        fail("OpenAPI path is missing: /health");
-      }
-      checkImplementedProductPaths(pathsBlock);
-    }
+  pass(`OpenAPI file found: ${openApiPath}`);
+  const parsed = yaml.load(readFileSync(openApiPath, "utf8"));
+  return asRecord(parsed, "OpenAPI document");
+}
 
-    if (!schemasBlock) {
-      fail("OpenAPI components.schemas block is missing");
-    } else {
-      checkHealthSchema(schemasBlock);
-      checkErrorSchemas(schemasBlock);
-      checkProductSchema(schemasBlock);
-      checkRequestNullability(schemasBlock, "CreateProductRequest");
-      checkRequestNullability(schemasBlock, "UpdateProductRequest");
+async function main() {
+  const options = parseArguments(process.argv.slice(2));
+  const authorityRepo = resolve(backendRepo, options.authorityRepo);
+  const openapi = loadOpenApi(authorityRepo);
+
+  if (openapi) {
+    const schemas = getSchemas(openapi);
+    const responses = getResponses(openapi);
+
+    checkImplementedProductPaths(openapi);
+
+    if (schemas && responses) {
+      checkHealthSchema(schemas);
+      checkErrorSchemas(schemas, responses);
+      checkProductSchema(schemas);
+      checkRequestNullability(schemas, "CreateProductRequest");
+      checkRequestNullability(schemas, "UpdateProductRequest");
     }
   }
+
+  checkRuntimeProductDtoShape();
+  await checkRuntimeResponses();
+
+  if (failures.length > 0) {
+    console.error(
+      `FAIL: Runtime conformance validation failed with ${failures.length} error(s).`
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log("PASS: Runtime conformance validation completed successfully.");
 }
 
-checkRuntimeProductDtoShape();
-await checkRuntimeResponses();
-
-if (failures.length > 0) {
-  console.error(
-    `FAIL: Runtime conformance validation failed with ${failures.length} error(s).`
+main().catch((error) => {
+  fail(
+    `Unexpected error during validation: ${
+      error instanceof Error ? error.message : String(error)
+    }`
   );
-  process.exit(1);
-}
-
-console.log("PASS: Runtime conformance validation completed successfully.");
+  process.exitCode = 1;
+});
