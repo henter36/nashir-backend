@@ -49,6 +49,11 @@ const IMPLEMENTED_PUBLIC_PRODUCT_ROUTES = [
 
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
+const SUPPORTED_LOCAL_REF_PREFIXES = [
+  "#/components/schemas/",
+  "#/components/responses/",
+  "#/paths/"
+];
 
 function pass(message) {
   console.log(`PASS: ${message}`);
@@ -101,27 +106,136 @@ function asRecord(value, label) {
   return null;
 }
 
-function hasRequiredField(schema, field) {
-  return Array.isArray(schema.required) && schema.required.includes(field);
+function decodeJsonPointerSegment(segment) {
+  return segment.replaceAll("~1", "/").replaceAll("~0", "~");
 }
 
-function declaresType(schema, expectedType) {
-  if (schema.type === expectedType) return true;
-  return Array.isArray(schema.type) && schema.type.includes(expectedType);
+function createLocalRefResolver(openapi) {
+  return function resolveLocalRef(ref, label) {
+    if (typeof ref !== "string") {
+      fail(`${label} $ref is not a string`);
+      return undefined;
+    }
+
+    if (!ref.startsWith("#/")) {
+      fail(`${label} external $ref is not supported in Phase 1: ${ref}`);
+      return undefined;
+    }
+
+    if (
+      !SUPPORTED_LOCAL_REF_PREFIXES.some((prefix) => ref.startsWith(prefix))
+    ) {
+      fail(`${label} local $ref is outside the Phase 1 resolver scope: ${ref}`);
+      return undefined;
+    }
+
+    let current = openapi;
+    for (const segment of ref
+      .slice(2)
+      .split("/")
+      .map(decodeJsonPointerSegment)) {
+      if (!isRecord(current) && !Array.isArray(current)) {
+        fail(`${label} $ref could not be resolved: ${ref}`);
+        return undefined;
+      }
+      current = current[segment];
+    }
+
+    if (current === undefined) {
+      fail(`${label} $ref could not be resolved: ${ref}`);
+    }
+    return current;
+  };
 }
 
-function supportsNull(schema, seen = new Set()) {
-  if (!isRecord(schema) || seen.has(schema)) return false;
-  seen.add(schema);
+function dereference(value, resolveLocalRef, label, seenRefs, seenObjects) {
+  if (!isRecord(value)) return value;
 
-  if (schema.nullable === true) return true;
-  if (declaresType(schema, "null")) return true;
+  if (seenObjects.has(value)) {
+    fail(`${label} contains a circular schema object reference`);
+    return undefined;
+  }
+  seenObjects.add(value);
+
+  if (typeof value.$ref !== "string") return value;
+
+  if (seenRefs.has(value.$ref)) {
+    fail(`${label} contains a circular $ref: ${value.$ref}`);
+    return undefined;
+  }
+
+  seenRefs.add(value.$ref);
+  const resolved = resolveLocalRef(value.$ref, label);
+  if (resolved === undefined) return undefined;
+
+  return dereference(
+    resolved,
+    resolveLocalRef,
+    `${label} ${value.$ref}`,
+    seenRefs,
+    seenObjects
+  );
+}
+
+function resolveSchema(value, resolveLocalRef, label) {
+  return dereference(value, resolveLocalRef, label, new Set(), new Set());
+}
+
+function asResolvedRecord(value, resolveLocalRef, label) {
+  return asRecord(resolveSchema(value, resolveLocalRef, label), label);
+}
+
+function hasRequiredField(schema, resolveLocalRef, label, field) {
+  const resolved = resolveSchema(schema, resolveLocalRef, label);
+  return (
+    isRecord(resolved) &&
+    Array.isArray(resolved.required) &&
+    resolved.required.includes(field)
+  );
+}
+
+function declaresType(schema, resolveLocalRef, label, expectedType) {
+  const resolved = resolveSchema(schema, resolveLocalRef, label);
+  if (!isRecord(resolved)) return false;
+
+  if (resolved.type === expectedType) return true;
+  return Array.isArray(resolved.type) && resolved.type.includes(expectedType);
+}
+
+function supportsNull(
+  schema,
+  resolveLocalRef,
+  label,
+  seenRefs = new Set(),
+  seenObjects = new Set()
+) {
+  if (!isRecord(schema)) return false;
+
+  const resolved = dereference(
+    schema,
+    resolveLocalRef,
+    label,
+    seenRefs,
+    seenObjects
+  );
+  if (!isRecord(resolved)) return false;
+
+  if (resolved.nullable === true) return true;
+  if (declaresType(resolved, resolveLocalRef, label, "null")) return true;
 
   for (const compositionKey of ["anyOf", "oneOf", "allOf"]) {
-    const variants = schema[compositionKey];
+    const variants = resolved[compositionKey];
     if (
       Array.isArray(variants) &&
-      variants.some((variant) => supportsNull(variant, seen))
+      variants.some((variant, index) =>
+        supportsNull(
+          variant,
+          resolveLocalRef,
+          `${label}.${compositionKey}[${index}]`,
+          new Set(seenRefs),
+          new Set(seenObjects)
+        )
+      )
     ) {
       return true;
     }
@@ -141,9 +255,9 @@ function getResponses(openapi) {
   );
 }
 
-function checkRequiredFields(schema, schemaName, fields) {
+function checkRequiredFields(schema, schemaName, fields, resolveLocalRef) {
   for (const field of fields) {
-    if (hasRequiredField(schema, field)) {
+    if (hasRequiredField(schema, resolveLocalRef, schemaName, field)) {
       pass(`${schemaName} requires ${field}`);
     } else {
       fail(`${schemaName} does not require ${field}`);
@@ -151,22 +265,31 @@ function checkRequiredFields(schema, schemaName, fields) {
   }
 }
 
-function checkHealthSchema(schemas) {
-  const healthSchema = asRecord(
+function checkHealthSchema(schemas, resolveLocalRef) {
+  const healthSchema = asResolvedRecord(
     schemas.HealthResponse,
+    resolveLocalRef,
     "HealthResponse schema"
   );
   if (!healthSchema) return;
   pass("HealthResponse schema exists");
 
-  const data = asRecord(
+  const data = asResolvedRecord(
     healthSchema.properties?.data,
+    resolveLocalRef,
     "HealthResponse.data property"
   );
   if (!data) return;
 
   for (const field of REQUIRED_HEALTH_DATA_FIELDS) {
-    if (hasRequiredField(data, field)) {
+    if (
+      hasRequiredField(
+        data,
+        resolveLocalRef,
+        "HealthResponse.data property",
+        field
+      )
+    ) {
       pass(`HealthResponse.data requires ${field}`);
     } else {
       fail(`HealthResponse.data does not require ${field}`);
@@ -174,14 +297,27 @@ function checkHealthSchema(schemas) {
   }
 }
 
-function checkErrorSchemas(schemas, responses) {
-  const errorModel = asRecord(schemas.ErrorModel, "ErrorModel schema");
+function checkErrorSchemas(schemas, responses, resolveLocalRef) {
+  const errorModel = asResolvedRecord(
+    schemas.ErrorModel,
+    resolveLocalRef,
+    "ErrorModel schema"
+  );
   if (errorModel) {
     pass("ErrorModel schema exists");
-    checkRequiredFields(errorModel, "ErrorModel", REQUIRED_ERROR_MODEL_FIELDS);
+    checkRequiredFields(
+      errorModel,
+      "ErrorModel",
+      REQUIRED_ERROR_MODEL_FIELDS,
+      resolveLocalRef
+    );
   }
 
-  const errorCode = asRecord(schemas.ErrorCode, "ErrorCode schema");
+  const errorCode = asResolvedRecord(
+    schemas.ErrorCode,
+    resolveLocalRef,
+    "ErrorCode schema"
+  );
   if (errorCode) {
     pass("ErrorCode schema exists");
     const enumValues = new Set(
@@ -196,8 +332,13 @@ function checkErrorSchemas(schemas, responses) {
     }
   }
 
+  const defaultError = asResolvedRecord(
+    responses.DefaultError,
+    resolveLocalRef,
+    "DefaultError response"
+  );
   const defaultErrorRef =
-    responses.DefaultError?.content?.["application/json"]?.schema?.$ref;
+    defaultError?.content?.["application/json"]?.schema?.$ref;
   if (defaultErrorRef === "#/components/schemas/ErrorModel") {
     pass("DefaultError response references ErrorModel");
   } else {
@@ -205,18 +346,25 @@ function checkErrorSchemas(schemas, responses) {
   }
 }
 
-function checkProductSchema(schemas) {
-  const product = asRecord(schemas.Product, "Product schema");
+function checkProductSchema(schemas, resolveLocalRef) {
+  const product = asResolvedRecord(
+    schemas.Product,
+    resolveLocalRef,
+    "Product schema"
+  );
   if (!product) return;
   pass("Product schema exists");
 
-  const version = asRecord(
+  const version = asResolvedRecord(
     product.properties?.version,
+    resolveLocalRef,
     "Product.version property"
   );
   if (!version) return;
 
-  if (declaresType(version, "string")) {
+  if (
+    declaresType(version, resolveLocalRef, "Product.version property", "string")
+  ) {
     pass("Product.version is string in OpenAPI");
   } else {
     fail("Product.version is not string in OpenAPI");
@@ -230,19 +378,24 @@ function checkProductSchema(schemas) {
   }
 }
 
-function checkRequestNullability(schemas, schemaName) {
-  const schema = asRecord(schemas[schemaName], `${schemaName} schema`);
+function checkRequestNullability(schemas, schemaName, resolveLocalRef) {
+  const schema = asResolvedRecord(
+    schemas[schemaName],
+    resolveLocalRef,
+    `${schemaName} schema`
+  );
   if (!schema) return;
   pass(`${schemaName} schema exists`);
 
   for (const field of NULLABLE_PRODUCT_REQUEST_FIELDS) {
-    const property = asRecord(
+    const property = asResolvedRecord(
       schema.properties?.[field],
+      resolveLocalRef,
       `${schemaName}.${field} property`
     );
     if (!property) continue;
 
-    if (supportsNull(property)) {
+    if (supportsNull(property, resolveLocalRef, `${schemaName}.${field}`)) {
       pass(`${schemaName}.${field} allows null`);
     } else {
       fail(`${schemaName}.${field} does not allow null`);
@@ -250,18 +403,24 @@ function checkRequestNullability(schemas, schemaName) {
   }
 }
 
-function checkImplementedProductPaths(openapi) {
+function checkImplementedProductPaths(openapi, resolveLocalRef) {
   const paths = asRecord(openapi.paths, "OpenAPI paths");
   if (!paths) return;
 
-  if (paths["/health"]) {
+  if (
+    asResolvedRecord(paths["/health"], resolveLocalRef, "OpenAPI path /health")
+  ) {
     pass("OpenAPI path exists: /health");
   } else {
     fail("OpenAPI path is missing: /health");
   }
 
   for (const [method, path] of IMPLEMENTED_PUBLIC_PRODUCT_ROUTES) {
-    const pathItem = asRecord(paths[path], `OpenAPI path ${path}`);
+    const pathItem = asResolvedRecord(
+      paths[path],
+      resolveLocalRef,
+      `OpenAPI path ${path}`
+    );
     if (!pathItem) continue;
     pass(`OpenAPI path exists: ${path}`);
 
@@ -439,17 +598,18 @@ async function main() {
   const openapi = loadOpenApi(authorityRepo);
 
   if (openapi) {
+    const resolveLocalRef = createLocalRefResolver(openapi);
     const schemas = getSchemas(openapi);
     const responses = getResponses(openapi);
 
-    checkImplementedProductPaths(openapi);
+    checkImplementedProductPaths(openapi, resolveLocalRef);
 
     if (schemas && responses) {
-      checkHealthSchema(schemas);
-      checkErrorSchemas(schemas, responses);
-      checkProductSchema(schemas);
-      checkRequestNullability(schemas, "CreateProductRequest");
-      checkRequestNullability(schemas, "UpdateProductRequest");
+      checkHealthSchema(schemas, resolveLocalRef);
+      checkErrorSchemas(schemas, responses, resolveLocalRef);
+      checkProductSchema(schemas, resolveLocalRef);
+      checkRequestNullability(schemas, "CreateProductRequest", resolveLocalRef);
+      checkRequestNullability(schemas, "UpdateProductRequest", resolveLocalRef);
     }
   }
 
