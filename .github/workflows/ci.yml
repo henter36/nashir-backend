@@ -67,6 +67,12 @@ jobs:
             --authority-repo ../nashir-authority \
             --authority-ref e22c84fa0e2b6c01d4ee98383ef9fad2d0fa3337
 
+      - name: Validate runtime conformance
+        working-directory: nashir-backend
+        run: |
+          pnpm run validate:runtime-conformance -- \
+            --authority-repo ../nashir-authority
+
       - name: Lint
         working-directory: nashir-backend
         run: pnpm run lint
