@@ -8,6 +8,7 @@ import { evaluatePermissionGuard } from "../permission-guard.js";
 import type { IdempotencyRepository } from "../idempotency/idempotency-repository.js";
 import type { JsonValue } from "../idempotency/idempotency-types.js";
 import type { ProductRepository } from "./product-repository.js";
+import { toPublicProduct } from "./product-schema.js";
 import type {
   ListProductsQuerystring,
   ProductItemRouteParams,
@@ -467,7 +468,7 @@ export function createListProductsHandler(deps: {
     }
 
     return {
-      products: result.products,
+      products: result.products.map(toPublicProduct),
       count: result.count,
       hasMore: result.hasMore,
       nextCursor: result.nextCursor
@@ -614,7 +615,9 @@ export function createCreateProductHandler(deps: {
       throw err;
     }
 
-    const productResponse: ProductResponse = { product };
+    const productResponse: ProductResponse = {
+      product: toPublicProduct(product)
+    };
     await deps.idempotencyRepository.markIdempotencyRecordCompleted({
       ...scope,
       responseStatusCode: 201,
@@ -654,7 +657,7 @@ export function createGetProductHandler(deps: {
       return;
     }
 
-    return { product };
+    return { product: toPublicProduct(product) };
   };
 }
 
@@ -804,6 +807,6 @@ export function createUpdateProductHandler(deps: {
       return;
     }
 
-    return { product: result.product };
+    return { product: toPublicProduct(result.product) };
   };
 }
