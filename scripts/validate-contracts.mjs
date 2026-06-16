@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 
-const EXPECTED_AUTHORITY_COMMIT = "1a30fb6a13bce5210a23ac8a5d1011187038609b";
+const EXPECTED_AUTHORITY_COMMIT = "e22c84fa0e2b6c01d4ee98383ef9fad2d0fa3337";
 
 const REQUIRED_CONTRACT_FILES = [
   "docs/nashir_v1_openapi.yaml",
