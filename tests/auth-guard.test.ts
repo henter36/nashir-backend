@@ -159,7 +159,7 @@ describe("authGuard — missing / malformed Authorization header", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 when Bearer token value is blank", async () => {
@@ -173,7 +173,7 @@ describe("authGuard — missing / malformed Authorization header", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 });
 
@@ -196,7 +196,7 @@ describe("authGuard — harness header boundary", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 });
 
@@ -216,7 +216,7 @@ describe("authGuard — malformed token structure", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 when kid is absent from header", async () => {
@@ -238,7 +238,7 @@ describe("authGuard — malformed token structure", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 });
 
@@ -262,7 +262,7 @@ describe("authGuard — claim validation", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 for wrong audience", async () => {
@@ -280,7 +280,7 @@ describe("authGuard — claim validation", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 for expired token (no leeway)", async () => {
@@ -335,7 +335,7 @@ describe("authGuard — claim validation", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 when iat is present but not numeric", async () => {
@@ -374,7 +374,7 @@ describe("authGuard — claim validation", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("returns 401 when iat is in the future beyond leeway", async () => {
@@ -396,7 +396,7 @@ describe("authGuard — claim validation", () => {
 
     expect(res.statusCode).toBe(401);
     const body = res.json();
-    expect(body.code).toBe("INVALID_TOKEN");
+    expect(body.errorCode).toBe("permission.denied");
   });
 
   it("accepts iat in the future within TOKEN_LEEWAY_SECONDS", async () => {
@@ -547,7 +547,7 @@ describe("authGuard — JWKS unavailable", () => {
 
     expect(res.statusCode).toBe(503);
     const body = res.json();
-    expect(body.code).toBe("JWKS_UNAVAILABLE");
+    expect(body.errorCode).toBe("service.unavailable");
   });
 });
 

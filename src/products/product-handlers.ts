@@ -560,7 +560,7 @@ export function createCreateProductHandler(deps: {
         sendError(
           reply,
           409,
-          "CONFLICT",
+          "IDEMPOTENCY_CONFLICT",
           "Request body conflicts with the original request for this idempotency key.",
           request.correlationId
         );
@@ -573,7 +573,7 @@ export function createCreateProductHandler(deps: {
       sendError(
         reply,
         409,
-        "CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
         "Idempotent request conflict.",
         request.correlationId
       );
@@ -794,7 +794,7 @@ export function createUpdateProductHandler(deps: {
       sendError(
         reply,
         409,
-        "CONFLICT",
+        "VERSION_CONFLICT",
         "Version conflict.",
         request.correlationId,
         {

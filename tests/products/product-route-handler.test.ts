@@ -220,7 +220,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}?limit=10`
       });
       expect(response.statusCode).toBe(401);
-      expect(response.json().code).toBe("REQUEST_CONTEXT_REQUIRED");
+      expect(response.json().errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when workspace is not found", async () => {
@@ -230,7 +230,7 @@ describeDb("Product Route Handlers", () => {
         url: `${UNKNOWN_WORKSPACE_PRODUCTS_URL}?limit=10`
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(body.errorCode).toBe("workspace.not_found");
     });
 
     it("returns 403 when nashir.products.read is missing from grantedPermissions", async () => {
@@ -241,7 +241,7 @@ describeDb("Product Route Handlers", () => {
         permissions: ""
       });
       expect(response.statusCode).toBe(403);
-      expect(body.code).toBe("FORBIDDEN");
+      expect(body.errorCode).toBe("permission.denied");
     });
 
     it("returns 400 when limit is absent", async () => {
@@ -251,7 +251,7 @@ describeDb("Product Route Handlers", () => {
         url: PRODUCTS_URL
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it.each(["0", "-5", "abc", "1.5"])(
@@ -263,7 +263,7 @@ describeDb("Product Route Handlers", () => {
           url: `${PRODUCTS_URL}?limit=${limit}`
         });
         expect(response.statusCode).toBe(400);
-        expect(body.code).toBe("BAD_REQUEST");
+        expect(body.errorCode).toBe("validation.failed");
       }
     );
 
@@ -274,7 +274,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}?limit=101`
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 400 when status is not a valid ProductStatus", async () => {
@@ -284,7 +284,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}?limit=10&status=invalid`
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 400 when updatedAfter is not a valid date", async () => {
@@ -294,7 +294,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}?limit=10&updatedAfter=not-a-date`
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 400 when sort is an unrecognized value", async () => {
@@ -304,7 +304,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}?limit=10&sort=name:asc`
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 400 when cursor is invalid", async () => {
@@ -315,7 +315,7 @@ describeDb("Product Route Handlers", () => {
         permissions: PERM_READ
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 200 with empty list when no products exist in workspace", async () => {
@@ -461,7 +461,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Test" })
       });
       expect(response.statusCode).toBe(401);
-      expect(response.json().code).toBe("REQUEST_CONTEXT_REQUIRED");
+      expect(response.json().errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when workspace is not found", async () => {
@@ -476,7 +476,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Test" })
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(body.errorCode).toBe("workspace.not_found");
     });
 
     it("returns 403 when nashir.products.manage is missing from grantedPermissions", async () => {
@@ -492,7 +492,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Test" })
       });
       expect(response.statusCode).toBe(403);
-      expect(body.code).toBe("FORBIDDEN");
+      expect(body.errorCode).toBe("permission.denied");
     });
 
     it("returns 400 when Idempotency-Key header is missing", async () => {
@@ -504,7 +504,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Test" })
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it.each(["workspaceId", "workspace_id"])(
@@ -521,7 +521,7 @@ describeDb("Product Route Handlers", () => {
           payload: JSON.stringify({ name: "Test", [field]: "ws-123" })
         });
         expect(response.statusCode).toBe(422);
-        expect(body.code).toBe("VALIDATION_FAILED");
+        expect(body.errorCode).toBe("validation.failed");
       }
     );
 
@@ -537,7 +537,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ category: "Gadgets" })
       });
       expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
+      expect(body.errorCode).toBe("validation.failed");
       expect(await auditEvents()).toHaveLength(0);
     });
 
@@ -570,7 +570,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify(payload)
       });
       expect(response.statusCode).toBe(422);
-      expect(body.code).toBe("VALIDATION_FAILED");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it("returns 201 with created product on first call", async () => {
@@ -694,7 +694,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Different Name" })
       });
       expect(second.response.statusCode).toBe(409);
-      expect(second.body.code).toBe("CONFLICT");
+      expect(second.body.errorCode).toBe("idempotency.conflict");
     });
   });
 
@@ -708,7 +708,7 @@ describeDb("Product Route Handlers", () => {
         url: `${PRODUCTS_URL}/some-product-id`
       });
       expect(response.statusCode).toBe(401);
-      expect(response.json().code).toBe("REQUEST_CONTEXT_REQUIRED");
+      expect(response.json().errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when workspace is not found", async () => {
@@ -718,7 +718,7 @@ describeDb("Product Route Handlers", () => {
         url: `${UNKNOWN_WORKSPACE_PRODUCTS_URL}/some-product-id`
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(body.errorCode).toBe("workspace.not_found");
     });
 
     it("returns 403 when nashir.products.read is missing from grantedPermissions", async () => {
@@ -729,7 +729,7 @@ describeDb("Product Route Handlers", () => {
         permissions: ""
       });
       expect(response.statusCode).toBe(403);
-      expect(body.code).toBe("FORBIDDEN");
+      expect(body.errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when product does not exist", async () => {
@@ -740,7 +740,7 @@ describeDb("Product Route Handlers", () => {
         permissions: PERM_READ
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
     });
 
     it("returns 404 when productId is not a valid UUID", async () => {
@@ -751,7 +751,7 @@ describeDb("Product Route Handlers", () => {
         permissions: PERM_READ
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
     });
 
     it("returns 404 when product belongs to a different workspace", async () => {
@@ -767,7 +767,7 @@ describeDb("Product Route Handlers", () => {
         permissions: PERM_READ
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
     });
 
     it("returns 200 with product when found", async () => {
@@ -804,7 +804,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(401);
-      expect(response.json().code).toBe("REQUEST_CONTEXT_REQUIRED");
+      expect(response.json().errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when workspace is not found", async () => {
@@ -819,7 +819,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(body.errorCode).toBe("workspace.not_found");
     });
 
     it("returns 403 when nashir.products.manage is missing from grantedPermissions", async () => {
@@ -835,7 +835,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(403);
-      expect(body.code).toBe("FORBIDDEN");
+      expect(body.errorCode).toBe("permission.denied");
     });
 
     it("returns 404 when productId is not a valid UUID", async () => {
@@ -850,7 +850,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
     });
 
     it("returns 400 when neither If-Match nor X-Resource-Version is present", async () => {
@@ -862,7 +862,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it.each(['"not-a-number"', '"abc"', "1abc", ""])(
@@ -879,7 +879,7 @@ describeDb("Product Route Handlers", () => {
           payload: JSON.stringify({ name: "Updated" })
         });
         expect(response.statusCode).toBe(400);
-        expect(body.code).toBe("BAD_REQUEST");
+        expect(body.errorCode).toBe("validation.failed");
       }
     );
 
@@ -895,7 +895,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(400);
-      expect(body.code).toBe("BAD_REQUEST");
+      expect(body.errorCode).toBe("validation.failed");
     });
 
     it.each(["0", "-1", "1abc"])(
@@ -912,7 +912,7 @@ describeDb("Product Route Handlers", () => {
           payload: JSON.stringify({ name: "Updated" })
         });
         expect(response.statusCode).toBe(400);
-        expect(body.code).toBe("BAD_REQUEST");
+        expect(body.errorCode).toBe("validation.failed");
       }
     );
 
@@ -930,7 +930,7 @@ describeDb("Product Route Handlers", () => {
           payload: JSON.stringify({ name: "Updated", [field]: "ws-123" })
         });
         expect(response.statusCode).toBe(422);
-        expect(body.code).toBe("VALIDATION_FAILED");
+        expect(body.errorCode).toBe("validation.failed");
       }
     );
 
@@ -938,22 +938,22 @@ describeDb("Product Route Handlers", () => {
       [
         422,
         "invalid status",
-        "VALIDATION_FAILED",
+        "validation.failed",
         { name: "Valid", status: "published" }
       ],
       [
         422,
         "invalid stockStatus",
-        "VALIDATION_FAILED",
+        "validation.failed",
         { name: "Valid", stockStatus: "plenty" }
       ],
       [
         422,
         "negative price",
-        "VALIDATION_FAILED",
+        "validation.failed",
         { name: "Valid", price: -5 }
       ],
-      [400, "no valid update fields", "BAD_REQUEST", {}]
+      [400, "no valid update fields", "validation.failed", {}]
     ])(
       "returns %i when body has %s",
       async (expectedStatus, _caseName, expectedCode, payload) => {
@@ -968,7 +968,7 @@ describeDb("Product Route Handlers", () => {
           payload: JSON.stringify(payload)
         });
         expect(response.statusCode).toBe(expectedStatus);
-        expect(body.code).toBe(expectedCode);
+        expect(body.errorCode).toBe(expectedCode);
         expect(await auditEvents()).toHaveLength(0);
       }
     );
@@ -985,7 +985,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Updated" })
       });
       expect(response.statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
       expect(await auditEvents()).toHaveLength(0);
     });
 
@@ -1045,7 +1045,7 @@ describeDb("Product Route Handlers", () => {
         payload: JSON.stringify({ name: "Stale Update" })
       });
       expect(response.statusCode).toBe(409);
-      expect(body.code).toBe("CONFLICT");
+      expect(body.errorCode).toBe("conflict.version_mismatch");
       expect(body.details?.currentVersion).toBe(created.version + 1);
       expect(await auditEvents()).toHaveLength(0);
     });

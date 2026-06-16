@@ -249,10 +249,11 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.get(HEALTH_ROUTE, async () => ({
-    status: "ok",
-    service: "nashir-backend",
-    runtime: "node",
-    uptimeSeconds: process.uptime()
+    data: {
+      service: "nashir-backend",
+      status: "ok",
+      version: "0.0.0"
+    }
   }));
 
   // Read-only harness proving request-context plumbing reaches a real route:

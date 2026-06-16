@@ -99,7 +99,24 @@ async function expectGuardError(
   const { reply } = await runGuard(input);
 
   expect(reply.statusCode).toBe(statusCode);
-  expect(reply.payload).toMatchObject({ code });
+  expect(reply.payload).toMatchObject({
+    errorCode: mapExpectedErrorCode(code),
+    requestId: "test-correlation-id",
+    retryable: statusCode === 503,
+    status: statusCode
+  });
+}
+
+function mapExpectedErrorCode(code: string): string {
+  const map: Record<string, string> = {
+    INVALID_WORKSPACE_ID: "validation.failed",
+    VERIFIED_IDENTITY_REQUIRED: "permission.denied",
+    WORKSPACE_ID_REQUIRED: "validation.failed",
+    WORKSPACE_MEMBERSHIP_UNAVAILABLE: "service.unavailable",
+    WORKSPACE_NOT_FOUND: "workspace.not_found"
+  };
+
+  return map[code] ?? code;
 }
 
 async function expectResolvedContext(

@@ -107,7 +107,7 @@ describe("workspace context app wiring", () => {
 
     const disabled = await get(appWith({ authConfig }));
     expect(disabled.response.statusCode).toBe(404);
-    expect(disabled.body.code).toBe("NOT_FOUND");
+    expect(disabled.body.errorCode).toBe("resource.not_found");
   });
 
   it("keeps harness unguarded without resolver", async () => {
@@ -132,14 +132,15 @@ describe("workspace context app wiring", () => {
   });
 
   it.each([
-    ["workspace_not_found", 404, "WORKSPACE_NOT_FOUND"],
-    ["not_member", 404, "WORKSPACE_NOT_FOUND"],
-    ["unavailable", 503, "WORKSPACE_MEMBERSHIP_UNAVAILABLE"]
-  ] as const)("maps %s resolver result", async (result, status, code) => {
+    ["workspace_not_found", 404, "workspace.not_found"],
+    ["not_member", 404, "workspace.not_found"],
+    ["unavailable", 503, "service.unavailable"]
+  ] as const)("maps %s resolver result", async (result, status, errorCode) => {
     const { response, body } = await get(guarded(outcome(result)));
 
     expect(response.statusCode).toBe(status);
-    expect(body.code).toBe(code);
+    expect(body.errorCode).toBe(errorCode);
+    expect(body.status).toBe(status);
   });
 
   it("maps thrown resolver errors without leaking details", async () => {
@@ -150,7 +151,8 @@ describe("workspace context app wiring", () => {
     const { response, body } = await get(guarded(resolver));
 
     expect(response.statusCode).toBe(503);
-    expect(body.code).toBe("WORKSPACE_MEMBERSHIP_UNAVAILABLE");
+    expect(body.errorCode).toBe("service.unavailable");
+    expect(body.status).toBe(503);
     expect(JSON.stringify(body)).not.toContain("private membership failure");
   });
 
@@ -162,7 +164,7 @@ describe("workspace context app wiring", () => {
     });
 
     expect(missingAuth.statusCode).toBe(401);
-    expect(missingAuth.json().code).toBe("MISSING_AUTHORIZATION_TOKEN");
+    expect(missingAuth.json().errorCode).toBe("permission.denied");
 
     const invalid = await get(
       guarded(),
@@ -170,7 +172,7 @@ describe("workspace context app wiring", () => {
     );
 
     expect(invalid.response.statusCode).toBe(400);
-    expect(invalid.body.code).toBe("INVALID_WORKSPACE_ID");
+    expect(invalid.body.errorCode).toBe("validation.failed");
   });
 
   it("does not attach roles or permissions to request context", async () => {

@@ -53,7 +53,7 @@ describe("permission guard internal runtime harness", () => {
       });
 
       expect(statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
       expect(body.message).toBe("Route not found.");
     });
 
@@ -67,7 +67,7 @@ describe("permission guard internal runtime harness", () => {
       });
 
       expect(statusCode).toBe(404);
-      expect(body.code).toBe("NOT_FOUND");
+      expect(body.errorCode).toBe("resource.not_found");
     });
 
     it("is exposed when enableInternalPermissionGuardHarnessRoutes is true", async () => {
@@ -97,10 +97,10 @@ describe("permission guard internal runtime harness", () => {
       });
 
       expect(statusCode).toBe(401);
-      expect(body.code).toBe("REQUEST_CONTEXT_REQUIRED");
-      expect(body.statusCode).toBe(401);
-      expect(typeof body.correlationId).toBe("string");
-      expect(body.correlationId).not.toHaveLength(0);
+      expect(body.errorCode).toBe("permission.denied");
+      expect(body.status).toBe(401);
+      expect(typeof body.requestId).toBe("string");
+      expect(body.requestId).not.toHaveLength(0);
     });
   });
 

@@ -174,7 +174,7 @@ describe("permission guard app wiring", () => {
     });
 
     expect(disabled.statusCode).toBe(404);
-    expect(disabled.json().code).toBe("NOT_FOUND");
+    expect(disabled.json().errorCode).toBe("resource.not_found");
   });
 
   it("requires Auth0 identity verification before the workspace permission harness runs", async () => {
@@ -185,7 +185,7 @@ describe("permission guard app wiring", () => {
     });
 
     expect(response.statusCode).toBe(401);
-    expect(response.json().code).toBe("MISSING_AUTHORIZATION_TOKEN");
+    expect(response.json().errorCode).toBe("permission.denied");
   });
 
   it("requires workspace context resolution before permission enforcement", async () => {
@@ -194,7 +194,7 @@ describe("permission guard app wiring", () => {
     );
 
     expect(response.statusCode).toBe(404);
-    expect(body.code).toBe("WORKSPACE_NOT_FOUND");
+    expect(body.errorCode).toBe("workspace.not_found");
     expect(JSON.stringify(body)).not.toContain("FORBIDDEN");
   });
 
