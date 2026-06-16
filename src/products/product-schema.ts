@@ -1,14 +1,25 @@
 import type { Product } from "./product-types.js";
 
+export type PublicProduct = Omit<Product, "version"> & {
+  version: string;
+};
+
 export interface ProductResponse {
-  product: Product;
+  product: PublicProduct;
 }
 
 export interface ProductListResponse {
-  products: Product[];
+  products: PublicProduct[];
   count: number;
   hasMore: boolean;
   nextCursor: string | null;
+}
+
+export function toPublicProduct(product: Product): PublicProduct {
+  return {
+    ...product,
+    version: String(product.version)
+  };
 }
 
 export interface ProductRouteParams {

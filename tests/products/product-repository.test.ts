@@ -61,6 +61,7 @@ describeDb("ProductRepository", () => {
     expect(created.price).toBe(19.95);
     expect(created.status).toBe("active");
     expect(created.stockStatus).toBe("available");
+    expect(typeof created.version).toBe("number");
     expect(created.version).toBe(1);
 
     const fetched = await repository.getProductById({
@@ -198,6 +199,7 @@ describeDb("ProductRepository", () => {
     expect(result.product.name).toBe("New Name");
     expect(result.product.price).toBe(25.5);
     expect(result.product.stockStatus).toBe("limited");
+    expect(typeof result.product.version).toBe("number");
     expect(result.product.version).toBe(created.version + 1);
   });
 

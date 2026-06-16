@@ -350,6 +350,7 @@ describeDb("Product Route Handlers", () => {
       });
       expect(response.statusCode).toBe(200);
       expect(body.products).toHaveLength(2);
+      expect(typeof body.products[0].version).toBe("string");
       expect(body.count).toBe(2);
       expect(body.hasMore).toBe(false);
       expect(body.nextCursor).toBeNull();
@@ -596,6 +597,7 @@ describeDb("Product Route Handlers", () => {
       expect(body.product.name).toBe("New Product");
       expect(body.product.status).toBe("active");
       expect(body.product.workspaceId).toBe(KNOWN_WORKSPACE);
+      expect(body.product.version).toBe("1");
 
       const events = await auditEvents();
       expect(events).toEqual([
@@ -786,6 +788,7 @@ describeDb("Product Route Handlers", () => {
       expect(body.product.productId).toBe(created.productId);
       expect(body.product.name).toBe("My Product");
       expect(body.product.workspaceId).toBe(KNOWN_WORKSPACE);
+      expect(body.product.version).toBe(String(created.version));
     });
   });
 
@@ -1070,7 +1073,7 @@ describeDb("Product Route Handlers", () => {
       expect(body.product.productId).toBe(created.productId);
       expect(body.product.name).toBe("Updated Name");
       expect(body.product.status).toBe("active");
-      expect(body.product.version).toBe(created.version + 1);
+      expect(body.product.version).toBe(String(created.version + 1));
 
       expect(await auditEvents()).toEqual([
         {
