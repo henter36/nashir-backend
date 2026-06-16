@@ -177,7 +177,7 @@ Checker assertions:
 
 ## Explicit exclusions
 
-The phase 1 checker must explicitly exclude:
+This planning gate and the phase 1 checker explicitly exclude:
 
 - Routes not implemented yet.
 - `Product.readiness` calculation.
