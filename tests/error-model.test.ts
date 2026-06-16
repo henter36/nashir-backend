@@ -7,33 +7,7 @@ import {
 } from "../src/error-model.js";
 
 describe("createErrorModel", () => {
-  it("creates a basic 401 error model", () => {
-    const model = createErrorModel({
-      code: "REQUEST_CONTEXT_REQUIRED",
-      message: "Missing required request context header(s).",
-      statusCode: 401
-    });
-
-    expect(model).toEqual({
-      code: "REQUEST_CONTEXT_REQUIRED",
-      message: "Missing required request context header(s).",
-      statusCode: 401
-    });
-  });
-
-  it("preserves code and message separately", () => {
-    const model = createErrorModel({
-      code: "VALIDATION_FAILED",
-      message: "The request body failed validation.",
-      statusCode: 422
-    });
-
-    expect(model.code).toBe("VALIDATION_FAILED");
-    expect(model.message).toBe("The request body failed validation.");
-    expect(model.code).not.toBe(model.message);
-  });
-
-  it("includes correlationId when provided", () => {
+  it("creates an authority-shaped 401 error model", () => {
     const model = createErrorModel({
       code: "REQUEST_CONTEXT_REQUIRED",
       message: "Missing required request context header(s).",
@@ -41,18 +15,36 @@ describe("createErrorModel", () => {
       correlationId: "correlation-123"
     });
 
-    expect(model.correlationId).toBe("correlation-123");
+    expect(model).toEqual({
+      errorCode: "permission.denied",
+      message: "Missing required request context header(s).",
+      requestId: "correlation-123",
+      retryable: false,
+      status: 401
+    });
   });
 
-  it("omits correlationId when not provided", () => {
+  it("maps validation errors to the authority validation code", () => {
+    const model = createErrorModel({
+      code: "VALIDATION_FAILED",
+      message: "The request body failed validation.",
+      statusCode: 422,
+      correlationId: "correlation-123"
+    });
+
+    expect(model.errorCode).toBe("validation.failed");
+    expect(model.message).toBe("The request body failed validation.");
+    expect(model.errorCode).not.toBe(model.message);
+  });
+
+  it("uses unknown requestId when no correlationId is provided", () => {
     const model = createErrorModel({
       code: "REQUEST_CONTEXT_REQUIRED",
       message: "Missing required request context header(s).",
       statusCode: 401
     });
 
-    expect("correlationId" in model).toBe(false);
-    expect(model.correlationId).toBeUndefined();
+    expect(model.requestId).toBe("unknown");
   });
 
   it("supports details when provided", () => {
@@ -62,6 +54,7 @@ describe("createErrorModel", () => {
       code: "REQUEST_CONTEXT_REQUIRED",
       message: "Missing required request context header(s).",
       statusCode: 401,
+      correlationId: "correlation-123",
       details
     });
 
@@ -72,11 +65,60 @@ describe("createErrorModel", () => {
     const model = createErrorModel({
       code: "INTERNAL_ERROR",
       message: "Something went wrong.",
-      statusCode: 500
+      statusCode: 500,
+      correlationId: "correlation-123"
     });
 
     expect("stack" in model).toBe(false);
-    expect(Object.keys(model)).toEqual(["code", "message", "statusCode"]);
+    expect(Object.keys(model)).toEqual([
+      "errorCode",
+      "message",
+      "requestId",
+      "retryable",
+      "status"
+    ]);
+  });
+
+  it("marks only retryable HTTP statuses as retryable", () => {
+    expect(
+      createErrorModel({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Internal server error.",
+        statusCode: 500
+      }).retryable
+    ).toBe(true);
+    expect(
+      createErrorModel({
+        code: "JWKS_UNAVAILABLE",
+        message: "Key server is unavailable.",
+        statusCode: 503
+      }).retryable
+    ).toBe(true);
+    expect(
+      createErrorModel({
+        code: "VALIDATION_FAILED",
+        message: "The request body failed validation.",
+        statusCode: 422
+      }).retryable
+    ).toBe(false);
+  });
+
+  it("maps conflict errors by idempotency vs version context", () => {
+    expect(
+      createErrorModel({
+        code: "CONFLICT",
+        message:
+          "Request body conflicts with the original request for this idempotency key.",
+        statusCode: 409
+      }).errorCode
+    ).toBe("idempotency.conflict");
+    expect(
+      createErrorModel({
+        code: "CONFLICT",
+        message: "Version conflict.",
+        statusCode: 409
+      }).errorCode
+    ).toBe("conflict.version_mismatch");
   });
 
   it("does not mutate input", () => {
@@ -158,10 +200,11 @@ describe("createHttpErrorResponse", () => {
     expect(response).toEqual({
       statusCode: 401,
       body: {
-        code: "REQUEST_CONTEXT_REQUIRED",
+        errorCode: "permission.denied",
         message: "Missing required request context header(s).",
-        statusCode: 401,
-        correlationId: "correlation-123"
+        requestId: "correlation-123",
+        retryable: false,
+        status: 401
       }
     });
   });

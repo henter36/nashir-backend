@@ -74,15 +74,14 @@ async function injectAndParse(app: FastifyInstance, options: InjectOptions) {
 }
 
 function expectHealthyBody(body: Record<string, unknown>): void {
-  expect(body.status).toBe("ok");
-  expect(body.service).toBe("nashir-backend");
-  expect(body.runtime).toBe("node");
-  expect(sortAlphabetically(Object.keys(body))).toEqual([
-    "runtime",
-    "service",
-    "status",
-    "uptimeSeconds"
-  ]);
+  expect(body).toEqual({
+    data: {
+      service: "nashir-backend",
+      status: "ok",
+      version: "0.0.0"
+    }
+  });
+  expect(sortAlphabetically(Object.keys(body))).toEqual(["data"]);
 }
 
 function expectInternalServerError(
@@ -90,11 +89,12 @@ function expectInternalServerError(
   body: Record<string, unknown>
 ): void {
   expect(statusCode).toBe(500);
-  expect(body.code).toBe("INTERNAL_SERVER_ERROR");
+  expect(body.errorCode).toBe("resource.not_found");
   expect(body.message).toBe("Internal server error.");
-  expect(body.statusCode).toBe(500);
-  expect(typeof body.correlationId).toBe("string");
-  expect(body.correlationId).not.toHaveLength(0);
+  expect(body.status).toBe(500);
+  expect(body.retryable).toBe(true);
+  expect(typeof body.requestId).toBe("string");
+  expect(body.requestId).not.toHaveLength(0);
   expect(body.error).toBeUndefined();
   expect(body.stack).toBeUndefined();
   expect(body.details).toBeUndefined();
@@ -106,11 +106,12 @@ function expectNotFound(
   body: Record<string, unknown>
 ): void {
   expect(statusCode).toBe(404);
-  expect(body.code).toBe("NOT_FOUND");
+  expect(body.errorCode).toBe("resource.not_found");
   expect(body.message).toBe("Route not found.");
-  expect(body.statusCode).toBe(404);
-  expect(typeof body.correlationId).toBe("string");
-  expect(body.correlationId).not.toHaveLength(0);
+  expect(body.status).toBe(404);
+  expect(body.retryable).toBe(false);
+  expect(typeof body.requestId).toBe("string");
+  expect(body.requestId).not.toHaveLength(0);
   expect(body.error).toBeUndefined();
   expect(body.stack).toBeUndefined();
 }
@@ -121,11 +122,12 @@ function expectRequestContextRequired(
   expectedDetails: unknown = BOTH_CONTEXT_HEADERS_MISSING_DETAILS
 ): void {
   expect(statusCode).toBe(401);
-  expect(body.code).toBe("REQUEST_CONTEXT_REQUIRED");
-  expect(body.statusCode).toBe(401);
+  expect(body.errorCode).toBe("permission.denied");
+  expect(body.status).toBe(401);
+  expect(body.retryable).toBe(false);
   expect(typeof body.message).toBe("string");
-  expect(typeof body.correlationId).toBe("string");
-  expect(body.correlationId).not.toHaveLength(0);
+  expect(typeof body.requestId).toBe("string");
+  expect(body.requestId).not.toHaveLength(0);
   expect(body.error).toBeUndefined();
   expect(body.details).toEqual(expectedDetails);
 }
@@ -144,7 +146,6 @@ describe("/health route preservation under request-context plumbing", () => {
     });
 
     expect(statusCode).toBe(200);
-    expect(typeof body.uptimeSeconds).toBe("number");
     expectHealthyBody(body);
   });
 
@@ -219,7 +220,7 @@ describe("not-found handling via the internal ErrorModel serializer", () => {
     });
 
     expectNotFound(statusCode, body);
-    expect(body.correlationId).toBe("caller-supplied-correlation-id");
+    expect(body.requestId).toBe("caller-supplied-correlation-id");
   });
 
   it("returns an ErrorModel 404 for /health/ once request context is satisfied, since it does not match the /health route", async () => {
@@ -268,7 +269,7 @@ describe("internal server error handling via the internal ErrorModel serializer"
     });
 
     expectInternalServerError(statusCode, body);
-    expect(body.correlationId).toBe("caller-supplied-correlation-id");
+    expect(body.requestId).toBe("caller-supplied-correlation-id");
   });
 });
 
@@ -369,8 +370,8 @@ describe("request-context plumbing on a gated non-health harness route", () => {
 
     expectRequestContextRequired(statusCode, body);
     expect(typeof body.message).toBe("string");
-    expect(typeof body.correlationId).toBe("string");
-    expect(body.correlationId.length).toBeGreaterThan(0);
+    expect(typeof body.requestId).toBe("string");
+    expect((body.requestId as string).length).toBeGreaterThan(0);
   });
 
   it("rejects requests with a blank workspace-id header with the consistent error shape", async () => {
@@ -390,7 +391,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
       body,
       BLANK_WORKSPACE_CONTEXT_DETAILS
     );
-    expect(typeof body.correlationId).toBe("string");
+    expect(typeof body.requestId).toBe("string");
   });
 
   it("rejects requests missing only the actor-id header with the consistent error shape", async () => {
@@ -423,7 +424,7 @@ describe("request-context plumbing on a gated non-health harness route", () => {
     });
 
     expect(statusCode).toBe(401);
-    expect(body.correlationId).toBe("caller-supplied-correlation-id");
+    expect(body.requestId).toBe("caller-supplied-correlation-id");
   });
 
   it("succeeds and attaches the resolved request context when both headers are valid", async () => {
