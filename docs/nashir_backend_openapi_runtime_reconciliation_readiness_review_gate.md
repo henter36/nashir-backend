@@ -11,7 +11,7 @@ This review is documentation-only. It confirms that the backend can proceed to a
 Authority repository:
 
 ```text
-/Users/mohammedalqudairi/workspace/nashir
+$NASHIR_AUTHORITY_REPO
 ```
 
 Verified HEAD:
@@ -36,7 +36,7 @@ This gate reviewed:
 - `scripts/validate-contracts.mjs`.
 - `scripts/validate-contract-authority.mjs`.
 - `.github/workflows/ci.yml`.
-- Authority OpenAPI at `/Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml`.
+- Authority OpenAPI at `$NASHIR_AUTHORITY_REPO/docs/nashir_v1_openapi.yaml`.
 - Runtime route registration in `src/app.ts` and `src/products/product-route.ts`.
 - Product handlers, schema, types, error model, idempotency, auth, workspace, and permission guard tests.
 - Generated type usage scans across `src`, `tests`, package metadata, and contract docs.
@@ -87,7 +87,7 @@ Authority OpenAPI includes a much broader V1 surface than the current runtime:
 - Analytics snapshot routes.
 - Audit event list route.
 
-Only `/health` and the four product operations have corresponding runtime routes today.
+Only `/health` and the four product operations have corresponding public contract runtime routes today; internal harness routes are excluded from that public-contract count.
 
 ## Product Route Reconciliation
 
