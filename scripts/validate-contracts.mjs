@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 
-const EXPECTED_AUTHORITY_COMMIT = "04f54f8be852001173f4014cb2d81c5cdb97e35c";
+const EXPECTED_AUTHORITY_COMMIT = "7962a35cec6f8372501b3a7b92062288e9b1d958";
 
 const REQUIRED_CONTRACT_FILES = [
   "docs/nashir_v1_openapi.yaml",
@@ -105,7 +105,10 @@ function readCommitFromGitMetadata(repoPath) {
       return COMMIT_SHA_PATTERN.test(ref) ? ref : null;
     }
 
-    const packedRefs = readFileSync(resolve(repoPath, ".git", "packed-refs"), "utf8");
+    const packedRefs = readFileSync(
+      resolve(repoPath, ".git", "packed-refs"),
+      "utf8"
+    );
     for (const line of packedRefs.split("\n")) {
       const [sha, name] = line.trim().split(/\s+/);
       if (name === symbolicRef && COMMIT_SHA_PATTERN.test(sha)) {
@@ -127,8 +130,13 @@ if (parsed.error) {
 
 const authorityRepoPath = resolve(parsed.authorityRepo);
 
-if (!existsSync(authorityRepoPath) || !statSync(authorityRepoPath).isDirectory()) {
-  stopNow(`Authority repository path is not a local directory: ${authorityRepoPath}`);
+if (
+  !existsSync(authorityRepoPath) ||
+  !statSync(authorityRepoPath).isDirectory()
+) {
+  stopNow(
+    `Authority repository path is not a local directory: ${authorityRepoPath}`
+  );
 }
 
 report(true, `Authority repository directory found: ${authorityRepoPath}`);
@@ -141,7 +149,10 @@ for (const relativePath of REQUIRED_CONTRACT_FILES) {
   );
 }
 
-const gateContent = readWorkingTreeFile(authorityRepoPath, AGENT_RUNTIME_GATE_RELATIVE_PATH);
+const gateContent = readWorkingTreeFile(
+  authorityRepoPath,
+  AGENT_RUNTIME_GATE_RELATIVE_PATH
+);
 
 if (gateContent === null) {
   report(
@@ -182,7 +193,9 @@ if (observedCommit === null) {
 const failureCount = outcomes.filter((ok) => !ok).length;
 
 if (failureCount > 0) {
-  console.error(`FAIL: Contract validation failed with ${failureCount} error(s).`);
+  console.error(
+    `FAIL: Contract validation failed with ${failureCount} error(s).`
+  );
   process.exit(1);
 }
 

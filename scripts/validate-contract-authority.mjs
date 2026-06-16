@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const PINNED_AUTHORITY_SHA = "13388d787f57e2d863eda960db6de497bd2efa6c";
+const PINNED_AUTHORITY_SHA = "7962a35cec6f8372501b3a7b92062288e9b1d958";
 const AUTHORITY_FILES = [
   "docs/nashir_v1_openapi.yaml",
   "docs/nashir_auth_rbac_workspace_identity_gate.md",
@@ -108,7 +108,9 @@ function verifyAllowedCiWorkflows() {
     const workflowDirectory = resolve(backendRepo, CI_WORKFLOW_DIRECTORY);
 
     if (!existsSync(workflowDirectory)) {
-      pass(`CI workflow directory absent from backend: ${CI_WORKFLOW_DIRECTORY}`);
+      pass(
+        `CI workflow directory absent from backend: ${CI_WORKFLOW_DIRECTORY}`
+      );
       return;
     }
 

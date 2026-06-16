@@ -215,5 +215,4 @@ describe("evaluatePermissionGuard", () => {
       requiredPermission: "workspace.products.read"
     });
   });
-
 });

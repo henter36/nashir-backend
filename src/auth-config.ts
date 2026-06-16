@@ -1,17 +1,15 @@
 import { z } from "zod";
 
-const httpsUrl = z
-  .string()
-  .refine(
-    (val) => {
-      try {
-        return new URL(val).protocol === "https:";
-      } catch {
-        return false;
-      }
-    },
-    { message: "must be a valid HTTPS URL" }
-  );
+const httpsUrl = z.string().refine(
+  (val) => {
+    try {
+      return new URL(val).protocol === "https:";
+    } catch {
+      return false;
+    }
+  },
+  { message: "must be a valid HTTPS URL" }
+);
 
 export const authConfigSchema = z.object({
   AUTH0_ISSUER_URL: httpsUrl.refine(
@@ -19,7 +17,10 @@ export const authConfigSchema = z.object({
     "must end with /"
   ),
   AUTH0_AUDIENCE: z.string().min(1, "must be a non-blank string"),
-  AUTH0_JWKS_URI: z.preprocess((val) => (val === "" ? undefined : val), httpsUrl.optional()),
+  AUTH0_JWKS_URI: z.preprocess(
+    (val) => (val === "" ? undefined : val),
+    httpsUrl.optional()
+  ),
   JWKS_CACHE_TTL_SECONDS: z.preprocess(
     (val) => (val === "" ? undefined : val),
     z.coerce.number().int().positive().default(600)
