@@ -16,7 +16,7 @@ Final gate result: GO for a follow-up implementation planning gate only. NO-GO f
 
 ## Current verified authority SHA
 
-Authority repository: `/Users/mohammedalqudairi/workspace/nashir`
+Authority repository: `$NASHIR_AUTHORITY_REPO`
 
 Verified authority SHA:
 
@@ -50,13 +50,13 @@ Runtime `Product` shape:
 | `productId` | `string` | Server-generated product identity. |
 | `workspaceId` | `string` | Route/workspace scoped. |
 | `name` | `string` | Required display name. |
-| `category` | `string | null` | Nullable persistence field. |
-| `price` | `number | null` | Nullable numeric field; DB stores `numeric`. |
-| `sku` | `string | null` | Nullable persistence field. |
+| `category` | `string \| null` | Nullable persistence field. |
+| `price` | `number \| null` | Nullable numeric field; DB stores `numeric`. |
+| `sku` | `string \| null` | Nullable persistence field. |
 | `stockStatus` | `StockStatus` | Non-null runtime value, default `unknown`. |
-| `imageUrl` | `string | null` | Nullable persistence field. |
-| `videoUrl` | `string | null` | Nullable persistence field. |
-| `description` | `string | null` | Nullable persistence field. |
+| `imageUrl` | `string \| null` | Nullable persistence field. |
+| `videoUrl` | `string \| null` | Nullable persistence field. |
+| `description` | `string \| null` | Nullable persistence field. |
 | `status` | `ProductStatus` | Non-null runtime value, default `draft`. |
 | `createdAt` | `string` | ISO string mapped from DB timestamp. |
 | `updatedAt` | `string` | ISO string mapped from DB timestamp. |
@@ -70,7 +70,7 @@ Runtime does not include a `readiness` field in the `Product` interface, reposit
 
 Authority source reviewed:
 
-- `/Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml`
+- `$NASHIR_AUTHORITY_REPO/docs/nashir_v1_openapi.yaml`
 
 Authority `Product` response shape:
 
@@ -79,13 +79,13 @@ Authority `Product` response shape:
 | `productId` | `string` | yes | Canonical identity. |
 | `workspaceId` | `string` | yes | Workspace boundary. |
 | `name` | `string` | yes | Display field only. |
-| `category` | `string | null` | no | Nullable in response. |
-| `price` | `number | null` | no | Nullable in response, minimum 0. |
-| `sku` | `string | null` | no | Nullable in response. |
+| `category` | `string \| null` | no | Nullable in response. |
+| `price` | `number \| null` | no | Nullable in response, minimum 0. |
+| `sku` | `string \| null` | no | Nullable in response. |
 | `stockStatus` | `StockStatus` | no | Optional response field. |
-| `imageUrl` | `string | null`, `uri` | no | Nullable in response. |
-| `videoUrl` | `string | null`, `uri` | no | Nullable in response. |
-| `description` | `string | null` | no | Nullable in response. |
+| `imageUrl` | `string \| null`, `uri` | no | Nullable in response. |
+| `videoUrl` | `string \| null`, `uri` | no | Nullable in response. |
+| `description` | `string \| null` | no | Nullable in response. |
 | `readiness` | `Readiness` | no | Optional advisory field. |
 | `status` | `ProductStatus` | yes | Required response field. |
 | `createdAt` | `string`, `date-time` | yes | Server timestamp. |
@@ -256,7 +256,7 @@ This gate does not authorize:
 - Changing `src/products/*`.
 - Changing `src/app.ts`.
 - Changing any runtime route, guard, repository, mapper, or handler.
-- Changing `/Users/mohammedalqudairi/workspace/nashir/docs/nashir_v1_openapi.yaml`.
+- Changing `$NASHIR_AUTHORITY_REPO/docs/nashir_v1_openapi.yaml`.
 - Changing backend OpenAPI copies or generated types.
 - Adding or modifying migrations.
 - Adding routes.
@@ -282,15 +282,15 @@ This documentation gate is accepted when:
 
 ## Validation commands
 
-Run from `/Users/mohammedalqudairi/workspace/nashir-backend`:
+Run from the nashir-backend repository root:
 
 ```sh
 pnpm run format:check
 pnpm run lint
 pnpm run typecheck
 pnpm test
-NASHIR_AUTHORITY_REPO=/Users/mohammedalqudairi/workspace/nashir pnpm run validate:contracts
-NASHIR_AUTHORITY_REPO=/Users/mohammedalqudairi/workspace/nashir pnpm run validate:contract-authority
+NASHIR_AUTHORITY_REPO=../nashir pnpm run validate:contracts
+NASHIR_AUTHORITY_REPO=../nashir pnpm run validate:contract-authority
 ```
 
 Expected result:
