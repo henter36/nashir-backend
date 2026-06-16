@@ -1,12 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
-import {
-  createLocalJWKSet,
-  exportJWK,
-  generateKeyPair,
-  SignJWT
-} from "jose";
+import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 
 import type { AuthConfig } from "../src/auth-config.js";
 import { buildApp } from "../src/app.js";
@@ -115,7 +110,9 @@ describe("authGuard — valid token", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.verifiedIdentityContext).toEqual({ actorId: "auth0|user-abc-123" });
+    expect(body.verifiedIdentityContext).toEqual({
+      actorId: "auth0|user-abc-123"
+    });
     expect(body.requestContextActorId).toBeNull();
   });
 
@@ -180,7 +177,6 @@ describe("authGuard — missing / malformed Authorization header", () => {
   });
 });
 
-
 // ---------------------------------------------------------------------------
 // Harness header boundary
 // ---------------------------------------------------------------------------
@@ -202,7 +198,6 @@ describe("authGuard — harness header boundary", () => {
     const body = res.json();
     expect(body.code).toBe("MISSING_AUTHORIZATION_TOKEN");
   });
-
 });
 
 // ---------------------------------------------------------------------------
@@ -409,7 +404,10 @@ describe("authGuard — claim validation", () => {
     // iat 30s in the future — within 60s leeway
     const nearFutureIat = Math.floor(Date.now() / 1000) + 30;
 
-    const token = await new SignJWT({ sub: "auth0|user-123", iat: nearFutureIat })
+    const token = await new SignJWT({
+      sub: "auth0|user-123",
+      iat: nearFutureIat
+    })
       .setProtectedHeader({ alg: "RS256", kid: TEST_KID })
       .setIssuer(TEST_ISSUER)
       .setAudience(TEST_AUDIENCE)
@@ -438,9 +436,12 @@ describe("authGuard — signature verification", () => {
     // Replace the payload segment with a different base64url-encoded payload
     const parts = validToken.split(".");
     const tamperedPayload = Buffer.from(
-      JSON.stringify({ sub: "auth0|attacker", iss: TEST_ISSUER, aud: TEST_AUDIENCE })
-    )
-      .toString("base64url");
+      JSON.stringify({
+        sub: "auth0|attacker",
+        iss: TEST_ISSUER,
+        aud: TEST_AUDIENCE
+      })
+    ).toString("base64url");
     const tampered = [parts[0], tamperedPayload, parts[2]].join(".");
 
     const res = await app.inject({
@@ -494,7 +495,9 @@ describe("authGuard — algorithm enforcement", () => {
   it("returns 401 for a token signed with HS256 (HMAC not in allowlist)", async () => {
     const app = buildTestApp();
     // Sign with HS256 using a symmetric key
-    const secret = new TextEncoder().encode("a-sufficiently-long-hmac-secret-key-32bytes");
+    const secret = new TextEncoder().encode(
+      "a-sufficiently-long-hmac-secret-key-32bytes"
+    );
     const token = await new SignJWT({ sub: "auth0|user-123" })
       .setProtectedHeader({ alg: "HS256", kid: TEST_KID })
       .setIssuedAt()
