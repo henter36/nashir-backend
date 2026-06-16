@@ -467,11 +467,13 @@ async function main() {
   console.log("PASS: Runtime conformance validation completed successfully.");
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   fail(
     `Unexpected error during validation: ${
       error instanceof Error ? error.message : String(error)
     }`
   );
   process.exitCode = 1;
-});
+}
