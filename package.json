@@ -16,6 +16,7 @@
     "test": "vitest run",
     "validate:contract-authority": "node scripts/validate-contract-authority.mjs",
     "validate:contracts": "node scripts/validate-contracts.mjs",
+    "validate:runtime-conformance": "node --import tsx scripts/validate-runtime-conformance.mjs",
     "db:migrate": "node scripts/migrate.mjs up",
     "db:migrate:status": "node scripts/migrate.mjs status",
     "test:db": "vitest run tests/migrations.test.ts"
@@ -31,6 +32,7 @@
     "@types/node": "^22.15.32",
     "@types/pg": "^8.15.4",
     "eslint": "^9.29.0",
+    "js-yaml": "^4.2.0",
     "prettier": "^3.5.3",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
