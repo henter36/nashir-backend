@@ -547,7 +547,7 @@ describe("authGuard — JWKS unavailable", () => {
 
     expect(res.statusCode).toBe(503);
     const body = res.json();
-    expect(body.errorCode).toBe("permission.denied");
+    expect(body.errorCode).toBe("service.unavailable");
   });
 });
 

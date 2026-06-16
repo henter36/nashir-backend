@@ -112,7 +112,7 @@ function mapExpectedErrorCode(code: string): string {
     INVALID_WORKSPACE_ID: "validation.failed",
     VERIFIED_IDENTITY_REQUIRED: "permission.denied",
     WORKSPACE_ID_REQUIRED: "validation.failed",
-    WORKSPACE_MEMBERSHIP_UNAVAILABLE: "permission.denied",
+    WORKSPACE_MEMBERSHIP_UNAVAILABLE: "service.unavailable",
     WORKSPACE_NOT_FOUND: "workspace.not_found"
   };
 

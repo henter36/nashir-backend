@@ -89,7 +89,7 @@ function expectInternalServerError(
   body: Record<string, unknown>
 ): void {
   expect(statusCode).toBe(500);
-  expect(body.errorCode).toBe("resource.not_found");
+  expect(body.errorCode).toBe("internal.error");
   expect(body.message).toBe("Internal server error.");
   expect(body.status).toBe(500);
   expect(body.retryable).toBe(true);

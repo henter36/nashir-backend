@@ -134,7 +134,7 @@ describe("workspace context app wiring", () => {
   it.each([
     ["workspace_not_found", 404, "workspace.not_found"],
     ["not_member", 404, "workspace.not_found"],
-    ["unavailable", 503, "permission.denied"]
+    ["unavailable", 503, "service.unavailable"]
   ] as const)("maps %s resolver result", async (result, status, errorCode) => {
     const { response, body } = await get(guarded(outcome(result)));
 
@@ -151,7 +151,7 @@ describe("workspace context app wiring", () => {
     const { response, body } = await get(guarded(resolver));
 
     expect(response.statusCode).toBe(503);
-    expect(body.errorCode).toBe("permission.denied");
+    expect(body.errorCode).toBe("service.unavailable");
     expect(body.status).toBe(503);
     expect(JSON.stringify(body)).not.toContain("private membership failure");
   });

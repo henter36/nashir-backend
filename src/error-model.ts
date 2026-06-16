@@ -59,28 +59,24 @@ function mapErrorCode(input: CreateErrorModelInput): string {
     return "workspace.not_found";
   }
 
-  if (input.code === "CONFLICT") {
-    return input.message.toLowerCase().includes("idempot")
-      ? "idempotency.conflict"
-      : "conflict.version_mismatch";
-  }
-
   const directMap: Record<string, string> = {
     BAD_REQUEST: "validation.failed",
     FORBIDDEN: "permission.denied",
-    INTERNAL_ERROR: "resource.not_found",
-    INTERNAL_SERVER_ERROR: "resource.not_found",
+    IDEMPOTENCY_CONFLICT: "idempotency.conflict",
+    INTERNAL_ERROR: "internal.error",
+    INTERNAL_SERVER_ERROR: "internal.error",
     INVALID_TOKEN: "permission.denied",
     INVALID_WORKSPACE_ID: "validation.failed",
-    JWKS_UNAVAILABLE: "permission.denied",
+    JWKS_UNAVAILABLE: "service.unavailable",
     MISSING_AUTHORIZATION_TOKEN: "permission.denied",
     NOT_FOUND: "resource.not_found",
     REQUEST_CONTEXT_REQUIRED: "permission.denied",
     VALIDATION_FAILED: "validation.failed",
+    VERSION_CONFLICT: "conflict.version_mismatch",
     VERIFIED_IDENTITY_REQUIRED: "permission.denied",
     WORKSPACE_ID_REQUIRED: "validation.failed",
-    WORKSPACE_MEMBERSHIP_UNAVAILABLE: "permission.denied"
+    WORKSPACE_MEMBERSHIP_UNAVAILABLE: "service.unavailable"
   };
 
-  return directMap[input.code] ?? "resource.not_found";
+  return directMap[input.code] ?? "unknown.error";
 }

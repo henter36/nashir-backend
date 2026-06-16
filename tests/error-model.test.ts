@@ -70,6 +70,7 @@ describe("createErrorModel", () => {
     });
 
     expect("stack" in model).toBe(false);
+    expect(model.errorCode).toBe("internal.error");
     expect(Object.keys(model)).toEqual([
       "errorCode",
       "message",
@@ -85,15 +86,15 @@ describe("createErrorModel", () => {
         code: "INTERNAL_SERVER_ERROR",
         message: "Internal server error.",
         statusCode: 500
-      }).retryable
-    ).toBe(true);
+      })
+    ).toMatchObject({ errorCode: "internal.error", retryable: true });
     expect(
       createErrorModel({
         code: "JWKS_UNAVAILABLE",
         message: "Key server is unavailable.",
         statusCode: 503
-      }).retryable
-    ).toBe(true);
+      })
+    ).toMatchObject({ errorCode: "service.unavailable", retryable: true });
     expect(
       createErrorModel({
         code: "VALIDATION_FAILED",
@@ -106,19 +107,30 @@ describe("createErrorModel", () => {
   it("maps conflict errors by idempotency vs version context", () => {
     expect(
       createErrorModel({
-        code: "CONFLICT",
-        message:
-          "Request body conflicts with the original request for this idempotency key.",
+        code: "IDEMPOTENCY_CONFLICT",
+        message: "Conflict without a distinguishing message.",
         statusCode: 409
       }).errorCode
     ).toBe("idempotency.conflict");
     expect(
       createErrorModel({
-        code: "CONFLICT",
-        message: "Version conflict.",
+        code: "VERSION_CONFLICT",
+        message: "Conflict without a distinguishing message.",
         statusCode: 409
       }).errorCode
     ).toBe("conflict.version_mismatch");
+  });
+
+  it("maps unknown internal codes to the authority fallback code", () => {
+    const model = createErrorModel({
+      code: "UNEXPECTED_RUNTIME_CODE",
+      message: "Unexpected runtime code.",
+      statusCode: 500
+    });
+
+    expect(model.errorCode).toBe("unknown.error");
+    expect(model.status).toBe(500);
+    expect(model.retryable).toBe(true);
   });
 
   it("does not mutate input", () => {
