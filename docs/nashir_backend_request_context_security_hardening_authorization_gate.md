@@ -30,6 +30,24 @@ Authorized item A:
 
 Tighten transitional request-context header fallback so it is explicitly test/local-only or guarded by a clear app configuration boundary.
 
+Transitional request-context headers covered by item A:
+
+- `x-nashir-actor-id`
+- `x-nashir-workspace-id`
+- `x-nashir-granted-permissions`
+
+Preferred implementation shape:
+
+- Add an explicit `buildApp` test/local option such as `enableTransitionalRequestContextHeaders: true`.
+- The option default must be `false`.
+- The option must only be used by tests and local harnesses.
+- Production/Auth0-configured paths must not consult transitional headers.
+
+Alternative implementation shape:
+
+- If an environment flag is used instead, it must be explicit, default-false, and clearly non-production, for example `NASHIR_ENABLE_TRANSITIONAL_REQUEST_CONTEXT_HEADERS=true`.
+- Environment-driven behavior must still satisfy all risk boundaries and Canonical non-goals / prohibited changes below.
+
 Allowed implementation outcomes for item A:
 
 - add an explicit app option that enables transitional request-context header mode;
@@ -62,7 +80,7 @@ Authorized test files for the implementation PR:
 
 No other implementation files are authorized by this gate.
 
-## Explicit Non-Goals
+## Canonical Non-Goals / Prohibited Changes
 
 The implementation PR must not:
 
@@ -84,6 +102,8 @@ The implementation PR must not:
 - change CI;
 - change migrations, DB schema, ORM, or persistence behavior.
 
+All implementation, test, risk, and acceptance decisions in this authorization gate inherit this canonical list.
+
 ## Risk Boundaries
 
 The implementation PR must preserve these boundaries:
@@ -97,6 +117,7 @@ The implementation PR must preserve these boundaries:
 - Missing permission behavior remains 403 in disclosing mode and 404 in non-disclosing mode.
 - Internal harness routes remain opt-in.
 - Product routes must not become usable with caller-supplied identity, workspace, or permission headers in production-oriented configuration.
+- See Canonical non-goals / prohibited changes for changes that remain outside scope even when implementing A or B.
 
 ## Expected Files For Implementation PR
 
@@ -164,12 +185,7 @@ The implementation PR is acceptable only if:
 
 - item A is implemented with an explicit test/local transitional mode or equivalent guarded boundary;
 - item B is implemented with a fail-fast configuration guard for product routes that require Auth0-backed workspace membership resolution;
-- no public API route is added, removed, or renamed;
-- OpenAPI and generated types remain unchanged;
-- ErrorModel contract remains unchanged;
-- permission semantics remain unchanged;
-- workspace membership semantics remain unchanged;
-- no allow-all membership fallback exists;
+- Canonical non-goals / prohibited changes are preserved;
 - no workspace or resource existence is disclosed through changed 401/403/404/503 behavior;
 - all required tests and validations pass.
 
@@ -178,6 +194,6 @@ The implementation PR is acceptable only if:
 Final decision:
 
 - GO to a limited implementation PR for A and B only.
-- NO-GO for any runtime, auth, workspace, permission, route, OpenAPI, generated type, CI, dependency, DB, migration, or broader behavior change outside A and B.
+- NO-GO for any behavior change outside A and B, including all Canonical non-goals / prohibited changes.
 
 This authorization PR is documentation-only.
