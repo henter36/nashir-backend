@@ -26,7 +26,10 @@ Generated clients remain blocked until a later explicit generated-client gate.
 No production or pilot readiness is claimed.
 
 `.env.example` contains placeholder variable names and values only. It contains
-no real secrets, production URLs, or credentials.
+no real secrets, production URLs, or credentials. Auth0 values must be taken
+from the real tenant, `NASHIR_AUTHORITY_REPO` is for local validation against
+the authority checkout, and database URLs are needed only for DB-backed checks
+or routes.
 
 ## Contract Authority
 
