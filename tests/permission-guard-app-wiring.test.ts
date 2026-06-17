@@ -3,8 +3,11 @@ import type { FastifyInstance } from "fastify";
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 
 import type { AuthConfig } from "../src/auth-config.js";
+import type { AuditRepository } from "../src/audit/audit-repository.js";
 import { buildApp, type BuildAppOptions } from "../src/app.js";
 import type { JwksGetKey } from "../src/auth-guard.js";
+import type { IdempotencyRepository } from "../src/idempotency/idempotency-repository.js";
+import type { ProductRepository } from "../src/products/product-repository.js";
 import { WORKSPACE_ID_HEADER } from "../src/request-context.js";
 import type {
   WorkspaceMembershipResolver,
@@ -42,6 +45,11 @@ let signingKey: CryptoKey;
 let resolveJwksKey: JwksGetKey;
 
 const openApps = new Set<FastifyInstance>();
+const productRouteDependencies = {
+  productRepository: {} as ProductRepository,
+  idempotencyRepository: {} as IdempotencyRepository,
+  auditRepository: {} as AuditRepository
+};
 
 interface HarnessRequestOptions {
   requiredPermission?: string;
@@ -188,6 +196,33 @@ describe("permission guard app wiring", () => {
     expect(response.json().errorCode).toBe("permission.denied");
   });
 
+  it("fails fast when Auth0-backed product routes are configured without workspace membership resolution", () => {
+    expect(() =>
+      buildApp({
+        logger: false,
+        authConfig,
+        jwksGetKey: resolveJwksKey,
+        ...productRouteDependencies
+      })
+    ).toThrow(
+      "Product routes require workspaceMembershipResolver when authConfig is configured."
+    );
+  });
+
+  it("allows Auth0-backed product route registration when workspace membership resolution is configured", async () => {
+    const app = appWith({
+      authConfig,
+      workspaceMembershipResolver: membership(),
+      ...productRouteDependencies
+    });
+
+    await app.ready();
+
+    expect(
+      app.hasRoute({ method: "GET", url: "/workspaces/:workspaceId/products" })
+    ).toBe(true);
+  });
+
   it("requires workspace context resolution before permission enforcement", async () => {
     const { response, body } = await injectHarness(
       protectedApp(membershipOutcome("not_member"))
@@ -270,6 +305,8 @@ describe("permission guard app wiring", () => {
         query: "grantedPermissions=harness.admin&permissions=harness.admin",
         headers: {
           "content-type": "application/json",
+          "x-nashir-actor-id": "spoofed-actor",
+          "x-nashir-workspace-id": workspace.other,
           "x-nashir-permissions": "harness.admin",
           "x-nashir-granted-permissions": "harness.admin"
         },

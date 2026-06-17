@@ -168,6 +168,7 @@ export interface BuildAppOptions extends FastifyServerOptions {
   // normal runtime use; callers must explicitly enable them.
   enableInternalHarnessRoutes?: boolean;
   enableInternalPermissionGuardHarnessRoutes?: boolean;
+  enableTransitionalRequestContextHeaders?: boolean;
   authConfig?: AuthConfig;
   jwksGetKey?: JwksGetKey;
   workspaceMembershipResolver?: WorkspaceMembershipResolver;
@@ -180,6 +181,7 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
   const {
     enableInternalHarnessRoutes,
     enableInternalPermissionGuardHarnessRoutes,
+    enableTransitionalRequestContextHeaders = false,
     authConfig,
     jwksGetKey,
     workspaceMembershipResolver,
@@ -205,15 +207,32 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     });
   }
 
+  if (
+    authGuardHook &&
+    !workspaceContextGuardHook &&
+    productRepository &&
+    idempotencyRepository &&
+    auditRepository
+  ) {
+    throw new Error(
+      "Product routes require workspaceMembershipResolver when authConfig is configured."
+    );
+  }
+
   // Request-context plumbing runs at onRequest -- the earliest hook, before
   // body parsing -- so unauthorized or malformed requests are rejected
   // without the cost or risk of parsing their payload. /health is identified
   // via Fastify's own route metadata (routeOptions.url), which Fastify
   // resolves from the matched route during routing and exposes by the time
   // onRequest hooks run; this avoids fragile manual URL parsing and keeps
-  // /health ungated and unaffected, responding identically to before.
+  // /health ungated and unaffected, responding identically to before. Unmatched
+  // routes also remain ungated so the generic 404 surface does not disclose
+  // auth or request-context policy for routes that do not exist.
   app.addHook("onRequest", async (request, reply) => {
-    if (request.routeOptions?.url === HEALTH_ROUTE) {
+    if (
+      request.routeOptions?.url === HEALTH_ROUTE ||
+      request.routeOptions?.url === undefined
+    ) {
       return;
     }
 
@@ -225,6 +244,23 @@ export function buildApp(opts: BuildAppOptions = {}): FastifyInstance {
     // available in builds/tests that do not provide authConfig.
     if (authGuardHook) {
       await authGuardHook(request, reply);
+      return;
+    }
+
+    if (!enableTransitionalRequestContextHeaders) {
+      const errorResponse = createHttpErrorResponse({
+        code: "REQUEST_CONTEXT_REQUIRED",
+        message:
+          "Request context requires auth configuration or explicit transitional header mode.",
+        statusCode: 401,
+        correlationId,
+        details: {
+          missing: [],
+          issues: []
+        }
+      });
+
+      reply.code(errorResponse.statusCode).send(errorResponse.body);
       return;
     }
 

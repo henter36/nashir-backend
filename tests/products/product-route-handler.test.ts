@@ -125,6 +125,7 @@ describeDb("Product Route Handlers", () => {
   ): FastifyInstance {
     const app = buildApp({
       logger: false,
+      enableTransitionalRequestContextHeaders: true,
       productRepository,
       idempotencyRepository,
       auditRepository: auditRepositoryOverride

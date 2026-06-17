@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance, FastifyRequest, InjectOptions } from "fastify";
 
-import { buildApp } from "../src/app.js";
+import { buildApp, type BuildAppOptions } from "../src/app.js";
 import {
   ACTOR_ID_HEADER,
   CORRELATION_ID_HEADER,
@@ -50,10 +50,12 @@ async function throwingHandler(): Promise<never> {
   throw new Error(THROWN_ERROR_MESSAGE);
 }
 
-function buildAppWithHarness(
-  options: { enableInternalHarnessRoutes?: boolean } = {}
-): FastifyInstance {
-  const app = buildApp({ logger: false, ...options });
+function buildAppWithHarness(options: BuildAppOptions = {}): FastifyInstance {
+  const app = buildApp({
+    logger: false,
+    enableTransitionalRequestContextHeaders: true,
+    ...options
+  });
 
   // GET covers header-only assertions; POST lets the malformed/oversized
   // body tests prove gating happens before Fastify attempts to parse a body.
@@ -178,7 +180,7 @@ describe("/health route preservation under request-context plumbing", () => {
     expectHealthyBody(body);
   });
 
-  it("does not match the /health route (no trailing-slash normalization configured) and is therefore gated like any other unmatched path, not treated as /health", async () => {
+  it("does not match the /health route and falls through to the generic 404 surface", async () => {
     const app = buildAppWithHarness();
 
     const { statusCode, body } = await injectAndParse(app, {
@@ -186,7 +188,7 @@ describe("/health route preservation under request-context plumbing", () => {
       url: "/health/"
     });
 
-    expectRequestContextRequired(statusCode, body);
+    expectNotFound(statusCode, body);
   });
 });
 
@@ -360,6 +362,27 @@ describe("internal workspace route harness", () => {
 });
 
 describe("request-context plumbing on a gated non-health harness route", () => {
+  it("rejects transitional request-context headers by default unless explicitly enabled", async () => {
+    const app = buildAppWithHarness({
+      enableTransitionalRequestContextHeaders: false
+    });
+
+    const { statusCode, body } = await injectAndParse(app, {
+      method: "GET",
+      url: TEST_HARNESS_ROUTE,
+      headers: {
+        [WORKSPACE_ID_HEADER]: "workspace-123",
+        [ACTOR_ID_HEADER]: "actor-456",
+        [GRANTED_PERMISSIONS_HEADER]: "nashir.products.read"
+      }
+    });
+
+    expect(statusCode).toBe(401);
+    expect(body.errorCode).toBe("permission.denied");
+    expect(body.status).toBe(401);
+    expect(body.details).toEqual({ missing: [], issues: [] });
+  });
+
   it("rejects requests missing both request-context headers with the consistent error shape", async () => {
     const app = buildAppWithHarness();
 
