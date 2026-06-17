@@ -34,15 +34,27 @@ export function getRequiredTestDatabaseUrl(testName: string): string {
   return testDatabaseUrl;
 }
 
+export function buildTestMigrationEnv(
+  testDatabaseUrl: string,
+  baseEnv: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  const env = { ...baseEnv };
+
+  delete env.MIGRATION_DATABASE_URL;
+  delete env.DATABASE_URL;
+
+  return {
+    ...env,
+    NODE_ENV: "test",
+    TEST_DATABASE_URL: testDatabaseUrl
+  };
+}
+
 export function runMigrationsForTestDatabase(testDatabaseUrl: string): void {
   execFileSync(process.execPath, ["scripts/migrate.mjs", "up"], {
     cwd: process.cwd(),
     encoding: "utf8",
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      TEST_DATABASE_URL: testDatabaseUrl
-    }
+    env: buildTestMigrationEnv(testDatabaseUrl)
   });
 }
 
