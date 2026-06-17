@@ -34,13 +34,26 @@ export function getRequiredTestDatabaseUrl(testName: string): string {
   return testDatabaseUrl;
 }
 
+const TEST_MIGRATION_ENV_EXCLUDED_KEYS = new Set([
+  "MIGRATION_DATABASE_URL",
+  "DATABASE_URL"
+]);
+
+function omitTestMigrationDatabaseOverrides(
+  baseEnv: NodeJS.ProcessEnv
+): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(baseEnv).filter(
+      ([key]) => !TEST_MIGRATION_ENV_EXCLUDED_KEYS.has(key)
+    )
+  ) as NodeJS.ProcessEnv;
+}
+
 export function buildTestMigrationEnv(
   testDatabaseUrl: string,
   baseEnv: NodeJS.ProcessEnv = process.env
 ): NodeJS.ProcessEnv {
-  const { MIGRATION_DATABASE_URL, DATABASE_URL, ...env } = baseEnv;
-  void MIGRATION_DATABASE_URL;
-  void DATABASE_URL;
+  const env = omitTestMigrationDatabaseOverrides(baseEnv);
 
   return {
     ...env,
