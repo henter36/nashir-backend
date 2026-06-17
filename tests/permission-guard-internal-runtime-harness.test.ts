@@ -27,7 +27,11 @@ const UNREQUESTED_FIXTURE_PERMISSION = "harness.write";
 const apps: FastifyInstance[] = [];
 
 function buildHarnessApp(options: BuildAppOptions = {}): FastifyInstance {
-  const app = buildApp({ logger: false, ...options });
+  const app = buildApp({
+    logger: false,
+    enableTransitionalRequestContextHeaders: true,
+    ...options
+  });
   apps.push(app);
   return app;
 }

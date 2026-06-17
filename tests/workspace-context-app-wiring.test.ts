@@ -190,6 +190,7 @@ describe("workspace context app wiring", () => {
   it("keeps transitional header mode isolated when authConfig is absent", async () => {
     const app = appWith({
       enableInternalHarnessRoutes: true,
+      enableTransitionalRequestContextHeaders: true,
       workspaceMembershipResolver: member()
     });
 
