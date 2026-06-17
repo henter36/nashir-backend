@@ -174,9 +174,9 @@ pnpm run format:check
 pnpm run lint
 pnpm run typecheck
 pnpm test
-NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-e22 pnpm run validate:contracts
-NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-e22 pnpm run validate:contract-authority
-NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-e22 pnpm run validate:runtime-conformance
+NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-pinned pnpm run validate:contracts
+NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-pinned pnpm run validate:contract-authority
+NASHIR_AUTHORITY_REPO=/tmp/nashir-authority-pinned pnpm run validate:runtime-conformance
 ```
 
 ## Acceptance Criteria
