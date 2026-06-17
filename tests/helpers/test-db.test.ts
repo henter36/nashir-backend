@@ -7,6 +7,8 @@ describe("buildTestMigrationEnv", () => {
     const env = buildTestMigrationEnv("postgres://localhost/test_db", {
       DATABASE_URL: "postgres://localhost/runtime_db",
       MIGRATION_DATABASE_URL: "postgres://localhost/migration_db",
+      NODE_ENV: "development",
+      SOME_OTHER_ENV: "kept",
       PATH: "/usr/bin"
     });
 
@@ -15,6 +17,7 @@ describe("buildTestMigrationEnv", () => {
     expect(env).toMatchObject({
       NODE_ENV: "test",
       PATH: "/usr/bin",
+      SOME_OTHER_ENV: "kept",
       TEST_DATABASE_URL: "postgres://localhost/test_db"
     });
   });

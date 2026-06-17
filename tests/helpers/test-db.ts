@@ -38,10 +38,9 @@ export function buildTestMigrationEnv(
   testDatabaseUrl: string,
   baseEnv: NodeJS.ProcessEnv = process.env
 ): NodeJS.ProcessEnv {
-  const env = { ...baseEnv };
-
-  delete env.MIGRATION_DATABASE_URL;
-  delete env.DATABASE_URL;
+  const { MIGRATION_DATABASE_URL, DATABASE_URL, ...env } = baseEnv;
+  void MIGRATION_DATABASE_URL;
+  void DATABASE_URL;
 
   return {
     ...env,
