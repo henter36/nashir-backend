@@ -29,7 +29,8 @@ No production or pilot readiness is claimed.
 no real secrets, production URLs, or credentials. Auth0 values must be taken
 from the real tenant, `NASHIR_AUTHORITY_REPO` is for local validation against
 the authority checkout, and database URLs are needed only for DB-backed checks
-or routes.
+or routes. `MIGRATION_DATABASE_URL` is optional and commented out by default to
+avoid running test migrations against the development database.
 
 ## Contract Authority
 
