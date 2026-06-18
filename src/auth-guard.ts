@@ -70,9 +70,8 @@ export function createAuthGuardHook(opts: AuthGuardHookOptions) {
     // Step 1: Extract Bearer token
     const authHeader = request.headers.authorization;
     if (
-      !authHeader ||
-      !authHeader.startsWith("Bearer ") ||
-      authHeader.length <= 7
+      !authHeader?.startsWith("Bearer ") ||
+      (authHeader?.length ?? 0) <= "Bearer ".length
     ) {
       const resp = createHttpErrorResponse({
         code: "MISSING_AUTHORIZATION_TOKEN",

@@ -72,6 +72,7 @@ function isInvalidCursorError(err: unknown): boolean {
   const code = "code" in err ? (err as { code?: unknown }).code : undefined;
   return (
     err.message === "Invalid product list cursor" ||
+    err.message === "Invalid product list cursor payload" ||
     code === "22007" ||
     code === "22P02"
   );

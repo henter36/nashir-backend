@@ -21,6 +21,10 @@ const GENERATED_CLIENT_DIRECTORIES = [
 const CI_WORKFLOW_DIRECTORY = ".github/workflows";
 const ALLOWED_CI_WORKFLOW_FILES = new Set([".github/workflows/ci.yml"]);
 
+// Fixed, root-owned directories only -- prevents "git" from resolving to a
+// binary planted in a writable, attacker-controlled PATH entry.
+const TRUSTED_GIT_PATH = "/usr/bin:/bin";
+
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
 
@@ -71,7 +75,8 @@ function parseArguments(argv) {
 function runReadOnlyGit(authorityRepo, args) {
   return execFileSync("git", ["-C", authorityRepo, ...args], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, PATH: TRUSTED_GIT_PATH }
   }).trim();
 }
 
@@ -147,71 +152,73 @@ try {
   fail(error.message);
 }
 
-if (!options?.authorityRepo) {
+if (options?.authorityRepo) {
+  const requestedAuthorityRepo = resolve(options.authorityRepo);
+
+  if (existsSync(requestedAuthorityRepo)) {
+    if (lstatSync(requestedAuthorityRepo).isDirectory()) {
+      const authorityRepo = realpathSync(requestedAuthorityRepo);
+      pass(`Authority repository path exists: ${authorityRepo}`);
+
+      try {
+        const isGitRepository = runReadOnlyGit(authorityRepo, [
+          "rev-parse",
+          "--is-inside-work-tree"
+        ]);
+
+        if (isGitRepository === "true") {
+          pass(`Authority repository is a Git work tree: ${authorityRepo}`);
+
+          const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
+            "rev-parse",
+            "--verify",
+            `${options.authorityRef}^{commit}`
+          ]);
+
+          if (resolvedAuthoritySha === PINNED_AUTHORITY_SHA) {
+            pass(
+              `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
+            );
+
+            for (const relativePath of AUTHORITY_FILES) {
+              try {
+                runReadOnlyGit(authorityRepo, [
+                  "cat-file",
+                  "-e",
+                  `${PINNED_AUTHORITY_SHA}:${relativePath}`
+                ]);
+                pass(`Authority file exists at pinned SHA: ${relativePath}`);
+              } catch {
+                fail(`Authority file missing at pinned SHA: ${relativePath}`);
+              }
+            }
+          } else {
+            fail(
+              `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
+            );
+          }
+        } else {
+          fail(
+            `Authority repository path is not a Git work tree: ${authorityRepo}`
+          );
+        }
+      } catch (error) {
+        fail(
+          `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
+        );
+      }
+    } else {
+      fail(
+        `Authority repository path is not a directory: ${requestedAuthorityRepo}`
+      );
+    }
+  } else {
+    fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
+  }
+} else {
   fail(
     "Authority repository path is required via --authority-repo or NASHIR_AUTHORITY_REPO"
   );
-} else {
-  const requestedAuthorityRepo = resolve(options.authorityRepo);
-
-  if (!existsSync(requestedAuthorityRepo)) {
-    fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
-  } else if (!lstatSync(requestedAuthorityRepo).isDirectory()) {
-    fail(
-      `Authority repository path is not a directory: ${requestedAuthorityRepo}`
-    );
-  } else {
-    const authorityRepo = realpathSync(requestedAuthorityRepo);
-    pass(`Authority repository path exists: ${authorityRepo}`);
-
-    try {
-      const isGitRepository = runReadOnlyGit(authorityRepo, [
-        "rev-parse",
-        "--is-inside-work-tree"
-      ]);
-
-      if (isGitRepository !== "true") {
-        fail(
-          `Authority repository path is not a Git work tree: ${authorityRepo}`
-        );
-      } else {
-        pass(`Authority repository is a Git work tree: ${authorityRepo}`);
-
-        const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
-          "rev-parse",
-          "--verify",
-          `${options.authorityRef}^{commit}`
-        ]);
-
-        if (resolvedAuthoritySha !== PINNED_AUTHORITY_SHA) {
-          fail(
-            `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
-          );
-        } else {
-          pass(
-            `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
-          );
-
-          for (const relativePath of AUTHORITY_FILES) {
-            try {
-              runReadOnlyGit(authorityRepo, [
-                "cat-file",
-                "-e",
-                `${PINNED_AUTHORITY_SHA}:${relativePath}`
-              ]);
-              pass(`Authority file exists at pinned SHA: ${relativePath}`);
-            } catch {
-              fail(`Authority file missing at pinned SHA: ${relativePath}`);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      fail(
-        `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
-      );
-    }
-  }
 }
 
 verifyAbsentPaths(COPIED_AUTHORITY_FILES, "Copied authority file");

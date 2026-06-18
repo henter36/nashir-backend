@@ -37,25 +37,27 @@ function encodeCursor(cursor: ProductListCursor): string {
 }
 
 function decodeCursor(cursor: string): ProductListCursor {
+  let parsed: unknown;
+
   try {
-    const parsed = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8")
-    );
-
-    if (
-      typeof parsed?.updatedAt !== "string" ||
-      typeof parsed?.productId !== "string"
-    ) {
-      throw new Error("Invalid product list cursor payload");
-    }
-
-    return {
-      updatedAt: parsed.updatedAt,
-      productId: parsed.productId
-    };
+    parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
   } catch {
     throw new Error("Invalid product list cursor");
   }
+
+  const candidate = parsed as { updatedAt?: unknown; productId?: unknown };
+
+  if (
+    typeof candidate?.updatedAt !== "string" ||
+    typeof candidate?.productId !== "string"
+  ) {
+    throw new TypeError("Invalid product list cursor payload");
+  }
+
+  return {
+    updatedAt: candidate.updatedAt,
+    productId: candidate.productId
+  };
 }
 
 function normalizeLimit(limit: number): number {

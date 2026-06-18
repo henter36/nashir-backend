@@ -319,6 +319,21 @@ describeDb("Product Route Handlers", () => {
       expect(body.errorCode).toBe("validation.failed");
     });
 
+    it("returns 400 when cursor decodes to a well-formed but mistyped payload", async () => {
+      const app = buildHarnessApp();
+      const malformedCursor = Buffer.from(
+        JSON.stringify({ updatedAt: 123, productId: "abc" }),
+        "utf8"
+      ).toString("base64url");
+      const { response, body } = await harnessInject(app, {
+        method: "GET",
+        url: `${PRODUCTS_URL}?limit=10&cursor=${malformedCursor}`,
+        permissions: PERM_READ
+      });
+      expect(response.statusCode).toBe(400);
+      expect(body.errorCode).toBe("validation.failed");
+    });
+
     it("returns 200 with empty list when no products exist in workspace", async () => {
       const app = buildHarnessApp();
       const { response, body } = await harnessInject(app, {
