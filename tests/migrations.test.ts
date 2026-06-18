@@ -34,7 +34,7 @@ function getTestDatabaseUrl(): string {
     databaseName = "";
   }
 
-  if (!databaseName || !databaseName.includes("test")) {
+  if (!databaseName?.includes("test")) {
     throw new Error(
       `Refusing to reset non-test database "${databaseName || "unknown"}" in migration tests`
     );

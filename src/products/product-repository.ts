@@ -46,7 +46,7 @@ function decodeCursor(cursor: string): ProductListCursor {
       typeof parsed?.updatedAt !== "string" ||
       typeof parsed?.productId !== "string"
     ) {
-      throw new Error("Invalid product list cursor payload");
+      throw new TypeError("Invalid product list cursor payload");
     }
 
     return {

@@ -147,20 +147,12 @@ try {
   fail(error.message);
 }
 
-if (!options?.authorityRepo) {
-  fail(
-    "Authority repository path is required via --authority-repo or NASHIR_AUTHORITY_REPO"
-  );
-} else {
+if (options?.authorityRepo) {
   const requestedAuthorityRepo = resolve(options.authorityRepo);
 
   if (!existsSync(requestedAuthorityRepo)) {
     fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
-  } else if (!lstatSync(requestedAuthorityRepo).isDirectory()) {
-    fail(
-      `Authority repository path is not a directory: ${requestedAuthorityRepo}`
-    );
-  } else {
+  } else if (lstatSync(requestedAuthorityRepo).isDirectory()) {
     const authorityRepo = realpathSync(requestedAuthorityRepo);
     pass(`Authority repository path exists: ${authorityRepo}`);
 
@@ -170,11 +162,7 @@ if (!options?.authorityRepo) {
         "--is-inside-work-tree"
       ]);
 
-      if (isGitRepository !== "true") {
-        fail(
-          `Authority repository path is not a Git work tree: ${authorityRepo}`
-        );
-      } else {
+      if (isGitRepository === "true") {
         pass(`Authority repository is a Git work tree: ${authorityRepo}`);
 
         const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
@@ -183,11 +171,7 @@ if (!options?.authorityRepo) {
           `${options.authorityRef}^{commit}`
         ]);
 
-        if (resolvedAuthoritySha !== PINNED_AUTHORITY_SHA) {
-          fail(
-            `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
-          );
-        } else {
+        if (resolvedAuthoritySha === PINNED_AUTHORITY_SHA) {
           pass(
             `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
           );
@@ -204,14 +188,30 @@ if (!options?.authorityRepo) {
               fail(`Authority file missing at pinned SHA: ${relativePath}`);
             }
           }
+        } else {
+          fail(
+            `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
+          );
         }
+      } else {
+        fail(
+          `Authority repository path is not a Git work tree: ${authorityRepo}`
+        );
       }
     } catch (error) {
       fail(
         `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
       );
     }
+  } else {
+    fail(
+      `Authority repository path is not a directory: ${requestedAuthorityRepo}`
+    );
   }
+} else {
+  fail(
+    "Authority repository path is required via --authority-repo or NASHIR_AUTHORITY_REPO"
+  );
 }
 
 verifyAbsentPaths(COPIED_AUTHORITY_FILES, "Copied authority file");

@@ -142,7 +142,7 @@ describe("createErrorModel", () => {
       details: Object.freeze({ missing: ["x-nashir-workspace-id"] })
     });
 
-    const snapshotBefore = JSON.parse(JSON.stringify(input));
+    const snapshotBefore = structuredClone(input);
 
     createErrorModel(input);
 
@@ -228,7 +228,7 @@ describe("createHttpErrorResponse", () => {
       statusCode: 401
     });
 
-    const snapshotBefore = JSON.parse(JSON.stringify(input));
+    const snapshotBefore = structuredClone(input);
 
     createHttpErrorResponse(input);
 

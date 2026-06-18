@@ -33,7 +33,9 @@ function toNullableNumber(value: string | number | null): number | null {
   const numericValue = typeof value === "number" ? value : Number(value);
 
   if (!Number.isFinite(numericValue)) {
-    throw new Error("Invalid numeric product price returned from database");
+    throw new TypeError(
+      "Invalid numeric product price returned from database"
+    );
   }
 
   return numericValue;
