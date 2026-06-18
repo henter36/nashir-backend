@@ -155,63 +155,65 @@ try {
 if (options?.authorityRepo) {
   const requestedAuthorityRepo = resolve(options.authorityRepo);
 
-  if (!existsSync(requestedAuthorityRepo)) {
-    fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
-  } else if (lstatSync(requestedAuthorityRepo).isDirectory()) {
-    const authorityRepo = realpathSync(requestedAuthorityRepo);
-    pass(`Authority repository path exists: ${authorityRepo}`);
+  if (existsSync(requestedAuthorityRepo)) {
+    if (lstatSync(requestedAuthorityRepo).isDirectory()) {
+      const authorityRepo = realpathSync(requestedAuthorityRepo);
+      pass(`Authority repository path exists: ${authorityRepo}`);
 
-    try {
-      const isGitRepository = runReadOnlyGit(authorityRepo, [
-        "rev-parse",
-        "--is-inside-work-tree"
-      ]);
-
-      if (isGitRepository === "true") {
-        pass(`Authority repository is a Git work tree: ${authorityRepo}`);
-
-        const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
+      try {
+        const isGitRepository = runReadOnlyGit(authorityRepo, [
           "rev-parse",
-          "--verify",
-          `${options.authorityRef}^{commit}`
+          "--is-inside-work-tree"
         ]);
 
-        if (resolvedAuthoritySha === PINNED_AUTHORITY_SHA) {
-          pass(
-            `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
-          );
+        if (isGitRepository === "true") {
+          pass(`Authority repository is a Git work tree: ${authorityRepo}`);
 
-          for (const relativePath of AUTHORITY_FILES) {
-            try {
-              runReadOnlyGit(authorityRepo, [
-                "cat-file",
-                "-e",
-                `${PINNED_AUTHORITY_SHA}:${relativePath}`
-              ]);
-              pass(`Authority file exists at pinned SHA: ${relativePath}`);
-            } catch {
-              fail(`Authority file missing at pinned SHA: ${relativePath}`);
+          const resolvedAuthoritySha = runReadOnlyGit(authorityRepo, [
+            "rev-parse",
+            "--verify",
+            `${options.authorityRef}^{commit}`
+          ]);
+
+          if (resolvedAuthoritySha === PINNED_AUTHORITY_SHA) {
+            pass(
+              `Authority ref ${options.authorityRef} resolves to pinned SHA ${PINNED_AUTHORITY_SHA}`
+            );
+
+            for (const relativePath of AUTHORITY_FILES) {
+              try {
+                runReadOnlyGit(authorityRepo, [
+                  "cat-file",
+                  "-e",
+                  `${PINNED_AUTHORITY_SHA}:${relativePath}`
+                ]);
+                pass(`Authority file exists at pinned SHA: ${relativePath}`);
+              } catch {
+                fail(`Authority file missing at pinned SHA: ${relativePath}`);
+              }
             }
+          } else {
+            fail(
+              `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
+            );
           }
         } else {
           fail(
-            `Authority ref ${options.authorityRef} resolved to ${resolvedAuthoritySha}; expected ${PINNED_AUTHORITY_SHA}`
+            `Authority repository path is not a Git work tree: ${authorityRepo}`
           );
         }
-      } else {
+      } catch (error) {
         fail(
-          `Authority repository path is not a Git work tree: ${authorityRepo}`
+          `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
         );
       }
-    } catch (error) {
+    } else {
       fail(
-        `Authority repository Git verification failed: ${error.stderr?.trim() || error.message}`
+        `Authority repository path is not a directory: ${requestedAuthorityRepo}`
       );
     }
   } else {
-    fail(
-      `Authority repository path is not a directory: ${requestedAuthorityRepo}`
-    );
+    fail(`Authority repository path does not exist: ${requestedAuthorityRepo}`);
   }
 } else {
   fail(
