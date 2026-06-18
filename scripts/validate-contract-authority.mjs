@@ -21,6 +21,10 @@ const GENERATED_CLIENT_DIRECTORIES = [
 const CI_WORKFLOW_DIRECTORY = ".github/workflows";
 const ALLOWED_CI_WORKFLOW_FILES = new Set([".github/workflows/ci.yml"]);
 
+// Fixed, root-owned directories only -- prevents "git" from resolving to a
+// binary planted in a writable, attacker-controlled PATH entry.
+const TRUSTED_GIT_PATH = "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin";
+
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
 
@@ -71,7 +75,8 @@ function parseArguments(argv) {
 function runReadOnlyGit(authorityRepo, args) {
   return execFileSync("git", ["-C", authorityRepo, ...args], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"]
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, PATH: TRUSTED_GIT_PATH }
   }).trim();
 }
 
