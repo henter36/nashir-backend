@@ -1,7 +1,15 @@
 import { execFileSync } from "node:child_process";
 import console from "node:console";
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  lstatSync,
+  readdirSync,
+  realpathSync,
+  statSync
+} from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -21,9 +29,11 @@ const GENERATED_CLIENT_DIRECTORIES = [
 const CI_WORKFLOW_DIRECTORY = ".github/workflows";
 const ALLOWED_CI_WORKFLOW_FILES = new Set([".github/workflows/ci.yml"]);
 
-// Fixed, root-owned directories only -- prevents "git" from resolving to a
-// binary planted in a writable, attacker-controlled PATH entry.
-const TRUSTED_GIT_PATH = "/usr/bin:/bin";
+// Default, fixed system Git binary path for Linux/macOS CI and local
+// validation. Avoids searching PATH when running read-only Git authority
+// checks. There is no fallback to a bare "git" PATH lookup -- that is the
+// behavior that originally caused Sonar hotspot javascript:S4036.
+const DEFAULT_GIT_BINARY = "/usr/bin/git";
 
 const backendRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const failures = [];
@@ -36,6 +46,48 @@ function fail(message) {
   failures.push(message);
   console.error(`FAIL: ${message}`);
 }
+
+function isExecutableFile(candidatePath) {
+  try {
+    // statSync follows symlinks (common for Homebrew-installed binaries),
+    // unlike lstatSync, which reports on the symlink itself.
+    if (!statSync(candidatePath).isFile()) {
+      return false;
+    }
+    accessSync(candidatePath, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// NASHIR_GIT_BINARY allows a local override for environments where Git is
+// not at DEFAULT_GIT_BINARY. The override must be an absolute path to an
+// existing, executable file. An invalid override falls back to
+// DEFAULT_GIT_BINARY (never to a bare "git" PATH lookup) and is reported via
+// fail() so the misconfiguration is visible.
+function resolveTrustedGitBinary() {
+  const override = process.env.NASHIR_GIT_BINARY;
+
+  if (!override) {
+    return DEFAULT_GIT_BINARY;
+  }
+
+  if (!isAbsolute(override)) {
+    fail(`NASHIR_GIT_BINARY must be an absolute path: ${override}`);
+    return DEFAULT_GIT_BINARY;
+  }
+
+  if (!isExecutableFile(override)) {
+    fail(`NASHIR_GIT_BINARY must be an existing, executable file: ${override}`);
+    return DEFAULT_GIT_BINARY;
+  }
+
+  pass(`Using NASHIR_GIT_BINARY override: ${override}`);
+  return override;
+}
+
+const TRUSTED_GIT_BINARY = resolveTrustedGitBinary();
 
 function parseArguments(argv) {
   const options = {
@@ -73,10 +125,9 @@ function parseArguments(argv) {
 }
 
 function runReadOnlyGit(authorityRepo, args) {
-  return execFileSync("git", ["-C", authorityRepo, ...args], {
+  return execFileSync(TRUSTED_GIT_BINARY, ["-C", authorityRepo, ...args], {
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PATH: TRUSTED_GIT_PATH }
+    stdio: ["ignore", "pipe", "pipe"]
   }).trim();
 }
 
